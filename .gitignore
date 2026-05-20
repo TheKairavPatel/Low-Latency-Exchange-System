@@ -1,0 +1,13 @@
+# compiled output
+engine.exe
+engine
+
+# object files
+*.o
+*.obj
+
+# VS Code
+.vscode/
+
+# build artifacts
+*.out
