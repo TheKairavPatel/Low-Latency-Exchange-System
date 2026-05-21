@@ -16,4 +16,5 @@ class alignas(64) PriceLevel
     void cancelOrder(uint8_t slotIndex); 
     uint8_t getHead() const { return head; }
     uint8_t getTail() const { return tail; }
+    uint8_t isEmpty() const { return head == 0xFF; }
 };
