@@ -1,5 +1,4 @@
 #include "priceLevel.hpp"
-using namespace std;
 
 PriceLevel::PriceLevel()
 {
@@ -18,7 +17,8 @@ uint8_t PriceLevel::insertOrder(const ClientOrder& order)
     {
         return 0xFF; // No space for new orders
     }
-    uint8_t newIndex = freeIndexes[stackTop++];
+    uint8_t newIndex = freeIndexes[stackTop];
+    stackTop++;
     orders[newIndex].quantity = order.quantity;
     orders[newIndex].orderID = order.orderID;
     orders[newIndex].levelNext = 0xFF;
@@ -61,7 +61,7 @@ void PriceLevel::cancelOrder(uint8_t slotIndex)
     }
 }
 
-uint32_t PriceLevel::fillOrder(const ClientOrder& order)
+ClientOrder PriceLevel::fillOrder(const ClientOrder& order)
 {
     uint8_t current = head;
     uint32_t remaining = order.quantity;
@@ -96,11 +96,10 @@ uint32_t PriceLevel::fillOrder(const ClientOrder& order)
                 orders[next].levelPrev = prev;
 
             // push to free stack (O(1))
-            freeIndexes[stackTop++] = current;
+            freeIndexes[--stackTop] = current;
         }
 
         current = next;
     }
-
-    return remaining;
+    return ClientOrder{order.price, remaining, order.orderID, order.type};
 }
