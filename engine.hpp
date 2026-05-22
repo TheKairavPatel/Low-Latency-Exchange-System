@@ -13,9 +13,8 @@ class Engine
     
     public:
     Engine(uint32_t basePrice);
-    void processOrder(const ClientOrder& order);
-    
-    private:
-    uint16_t getBestAsk();
+    void ProcessOrder(const ClientOrder& order);
     uint16_t getBestBid();
+    uint16_t getBestAsk();
+    private:
 };
