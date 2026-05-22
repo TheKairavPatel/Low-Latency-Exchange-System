@@ -32,7 +32,7 @@ uint16_t Engine::getBestBid() // returns highest price level with available buy 
     return LEVELS; // No bids available
 }
 
-void Engine::ProcessOrder(const ClientOrder& order)
+void Engine::processOrder(const ClientOrder& order)
 {
     // Implementation of order processing logic goes here
     // This will involve matching orders, updating price levels, and managing the order book
