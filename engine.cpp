@@ -8,36 +8,26 @@ Engine::Engine(uint32_t basePrice) : basePrice(basePrice)
     memset(globalOrderInfos, 0, sizeof(globalOrderInfos));
 }
 
-void Engine::processAdd(const ClientOrder& order)
+uint16_t Engine::getBestAsk()
 {
-    uint16_t priceLevel = order.price - basePrice + 1000;
-    uint8_t slotIndex;
-    if (order.type == 0) // buy
+    for (int i = 0; i < 32; i++)
     {
-        slotIndex = buyLevels[priceLevel].insertOrder(order);
-        buyBitmap[priceLevel / 64] |= (1ULL << (priceLevel % 64));
+        if (sellBitmap[i] != 0)
+        {
+            return i*64 + __builtin_ctzll(sellBitmap[i]);
+        }
     }
-    else if (order.type == 1) // sell
-    {
-        slotIndex = sellLevels[priceLevel].insertOrder(order);
-        sellBitmap[priceLevel / 64] |= (1ULL << (priceLevel % 64));
-    }
-    globalOrderInfos[order.orderID] = {priceLevel, slotIndex, order.type};
+    return LEVELS; // No asks available
 }
 
-void Engine::processCancel(const ClientOrder& order)
+uint16_t Engine::getBestBid()
 {
-    GlobalOrderInfo info = globalOrderInfos[order.orderID];
-    if (info.side == 0)
+    for (int i = 31; i >= 0; i--)
     {
-        buyLevels[info.priceLevel].cancelOrder(info.posInArray);
-        if (buyLevels[info.priceLevel].isEmpty())
-            buyBitmap[info.priceLevel / 64] &= ~(1ULL << (info.priceLevel % 64));
+        if (buyBitmap[i] != 0)
+        {
+            return i*64 + (63 - __builtin_clzll(buyBitmap[i]));
+        }
     }
-    else
-    {
-        sellLevels[info.priceLevel].cancelOrder(info.posInArray);
-        if (sellLevels[info.priceLevel].isEmpty())
-            sellBitmap[info.priceLevel / 64] &= ~(1ULL << (info.priceLevel % 64));
-    }
+    return LEVELS; // No bids available
 }
