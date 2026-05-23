@@ -18,7 +18,7 @@ static inline uint64_t rdtsc_end() {
     return t;
 }
 
-static constexpr uint32_t BASE = 74200;
+static constexpr uint32_t BASE = 74000;
 static constexpr int N = 2'000'000;
 
 uint16_t freeIDs[65536];
@@ -29,54 +29,43 @@ inline void initIDs() {
 }
 inline uint16_t allocID() { return freeIDs[topID++]; }
 inline void freeID(uint16_t id) { freeIDs[--topID] = id; }
+
 volatile uint64_t sink = 0;
-
-// pregen arrays — no rng in hot loop
-struct OrderSpec { uint32_t price; uint32_t qty; };
-OrderSpec* insertSpecs;
-OrderSpec* cancelSpecs;
-struct MatchSpec { uint32_t askPrice; uint32_t buyPrice; uint32_t qty; };
-MatchSpec* matchSpecs;
-
 static Engine engine(BASE);
 
-int main() {
-    printf("starting\n"); fflush(stdout);
+// pregen
+struct InsertSpec { uint32_t price; uint32_t qty; };
+struct MatchSpec  { uint32_t askPrice; uint32_t buyPrice; uint32_t qty; };
+
+InsertSpec* insertSpecs;
+InsertSpec* cancelSpecs;
+MatchSpec*  matchSpecs;
+
+int main()
+{
     initIDs();
-    printf("IDs init\n"); fflush(stdout);
-    printf("engine init\n"); fflush(stdout);
 
     std::mt19937 rng(42);
-    // realistic SPY passive order distribution — clustered near mid
-    std::normal_distribution<double> bidOffsetDist(10.0, 5.0);  // ~10 ticks below mid
-    std::normal_distribution<double> askOffsetDist(10.0, 5.0);  // ~10 ticks above mid
+    std::normal_distribution<double> bidOffsetDist(10.0, 5.0);
+    std::normal_distribution<double> askOffsetDist(10.0, 5.0);
     std::uniform_int_distribution<uint32_t> qtyDist(1, 500);
-    std::uniform_int_distribution<uint32_t> aggOffsetDist(1, 20); // how far aggressive crosses
+    std::uniform_int_distribution<uint32_t> aggOffsetDist(1, 20);
 
-    // pregen insert specs — passive buys below mid
-    insertSpecs = new OrderSpec[N];
-    for (int i = 0; i < N; i++) {
-        int offset = std::max(1, (int)bidOffsetDist(rng));
-        offset = std::min(offset, 500); // clamp to valid range
-        insertSpecs[i] = {BASE + 1000 - (uint32_t)offset, qtyDist(rng)};
-    }
+    insertSpecs = new InsertSpec[N];
+    cancelSpecs = new InsertSpec[N];
+    matchSpecs  = new MatchSpec[N];
 
-    // pregen cancel specs — same distribution as insert
-    cancelSpecs = new OrderSpec[N];
-    for (int i = 0; i < N; i++) {
-        int offset = std::max(1, (int)bidOffsetDist(rng));
-        offset = std::min(offset, 500);
-        cancelSpecs[i] = {BASE + 1000 - (uint32_t)offset, qtyDist(rng)};
-    }
+    for (int i = 0; i < N; i++)
+    {
+        int bidOff = std::max(1, (int)bidOffsetDist(rng));
+        bidOff = std::min(bidOff, 500);
+        insertSpecs[i] = {BASE + 200 - (uint32_t)bidOff, qtyDist(rng)};
+        cancelSpecs[i] = {BASE + 200 - (uint32_t)bidOff, qtyDist(rng)};
 
-    // pregen match specs — ask near mid, aggressive buy crosses it
-    matchSpecs = new MatchSpec[N];
-    for (int i = 0; i < N; i++) {
-        int askOffset = std::max(1, (int)askOffsetDist(rng));
-        askOffset = std::min(askOffset, 500);
-        uint32_t askPrice = BASE + 1000 + (uint32_t)askOffset;
-        uint32_t aggOffset = aggOffsetDist(rng);
-        matchSpecs[i] = {askPrice, askPrice + aggOffset, qtyDist(rng)};
+        int askOff = std::max(1, (int)askOffsetDist(rng));
+        askOff = std::min(askOff, 500);
+        uint32_t askPrice = BASE + 200 + (uint32_t)askOff;
+        matchSpecs[i] = {askPrice, askPrice + aggOffsetDist(rng), qtyDist(rng)};
     }
 
     printf("pregen done\n"); fflush(stdout);
@@ -85,19 +74,17 @@ int main() {
     insertSamples.reserve(N);
     cancelSamples.reserve(N);
     matchSamples.reserve(N);
-    printf("vectors reserved\n"); fflush(stdout);
 
     // ── WARMUP ──
     for (int i = 0; i < 200000; i++) {
         uint16_t id = allocID();
-        engine.processOrder({BASE + 1000, 100, id, 0});
+        engine.processOrder({BASE + 200, 100, id, 0});
         engine.processOrder({0, 0, id, 2});
         freeID(id);
     }
     printf("warmup done\n"); fflush(stdout);
 
     // ── INSERT BENCH ──
-    // passive buys — no asks in book so guaranteed no match
     for (int i = 0; i < N; i++) {
         uint16_t id = allocID();
         uint64_t s = rdtsc_start();
@@ -105,15 +92,12 @@ int main() {
         uint64_t e = rdtsc_end();
         insertSamples.push_back(e - s);
         sink ^= id;
-        // dont track liveIDs here — cancel bench has its own setup
-        // just free after to avoid running out of IDs
         engine.processOrder({0, 0, id, 2});
         freeID(id);
     }
     printf("insert bench done\n"); fflush(stdout);
 
     // ── CANCEL BENCH ──
-    // insert N orders first then cancel them
     std::vector<uint16_t> liveIDs;
     liveIDs.reserve(N);
     for (int i = 0; i < N; i++) {
@@ -134,19 +118,15 @@ int main() {
     printf("cancel bench done\n"); fflush(stdout);
 
     // ── MATCH BENCH ──
-    // place passive ask then aggressive buy that always crosses
     for (int i = 0; i < N; i++) {
         uint16_t id1 = allocID();
         uint16_t id2 = allocID();
-        // passive ask
         engine.processOrder({matchSpecs[i].askPrice, matchSpecs[i].qty, id1, 1});
-        // aggressive buy — always crosses
         uint64_t s = rdtsc_start();
         engine.processOrder({matchSpecs[i].buyPrice, matchSpecs[i].qty, id2, 0});
         uint64_t e = rdtsc_end();
         matchSamples.push_back(e - s);
-        // if ask not fully filled, cancel it
-        if (!engine.getBestAsk() != 2048)
+        if (engine.getBestAsk() != LEVELS)
             engine.processOrder({0, 0, id1, 2});
         freeID(id1);
         freeID(id2);

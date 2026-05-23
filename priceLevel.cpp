@@ -61,17 +61,19 @@ void PriceLevel::cancelOrder(uint8_t slotIndex)
     }
 }
 
-ClientOrder PriceLevel::fillOrder(const ClientOrder& order)
+FillResult PriceLevel::fillOrder(const ClientOrder& order)
 {
     uint8_t current = head;
     uint32_t remaining = order.quantity;
+    FillResult result;
+    result.filledCount = 0;
+    result.remaining = {order.price, remaining, order.orderID, order.type};
 
     while (current != 0xFF && remaining > 0)
     {
         EngineOrder &node = orders[current];
         uint8_t next = node.levelNext;
 
-        // compute fill once (branch-light)
         uint32_t fill = (remaining < node.quantity)
                         ? remaining
                         : node.quantity;
@@ -79,12 +81,11 @@ ClientOrder PriceLevel::fillOrder(const ClientOrder& order)
         node.quantity -= fill;
         remaining -= fill;
 
-        // if fully filled → remove inline (no function call)
         if (node.quantity == 0)
         {
+            result.filledIDs[result.filledCount++] = node.orderID; // track filled maker
             uint8_t prev = node.levelPrev;
 
-            // unlink from list
             if (prev == 0xFF)
                 head = next;
             else
@@ -95,11 +96,11 @@ ClientOrder PriceLevel::fillOrder(const ClientOrder& order)
             else
                 orders[next].levelPrev = prev;
 
-            // push to free stack (O(1))
             freeIndexes[--stackTop] = current;
         }
 
         current = next;
     }
-    return ClientOrder{order.price, remaining, order.orderID, order.type};
+    result.remaining.quantity = remaining;
+    return result;
 }

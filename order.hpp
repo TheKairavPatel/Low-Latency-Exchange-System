@@ -21,4 +21,12 @@ struct GlobalOrderInfo
     uint16_t priceLevel;
     uint8_t posInArray;
     uint8_t side; // 0 for buy, 1 for sell
+    bool live;
+};
+
+struct FillResult
+{
+    ClientOrder remaining;
+    uint16_t filledIDs[255];
+    uint8_t filledCount;
 };

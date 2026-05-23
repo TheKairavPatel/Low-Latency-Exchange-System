@@ -17,4 +17,6 @@ class Engine
     uint16_t getBestBid();
     uint16_t getBestAsk();
     private:
+    void markFilled(const FillResult& result);
+    
 };

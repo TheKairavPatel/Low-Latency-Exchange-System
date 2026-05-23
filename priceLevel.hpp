@@ -1,6 +1,6 @@
+#pragma once
 #include <cstdint>
 #include "order.hpp"
-#pragma once
 
 class alignas(64) PriceLevel
 {
@@ -15,7 +15,7 @@ class alignas(64) PriceLevel
     //------------FUNCTIONS-------------
     PriceLevel();
     uint8_t insertOrder(const ClientOrder& order);
-    ClientOrder fillOrder(const ClientOrder& order); // returns the quantity left
+    FillResult fillOrder(const ClientOrder& order); // returns remaining + filled IDs
     void cancelOrder(uint8_t slotIndex); 
     uint8_t getHead() const { return head; }
     uint8_t getTail() const { return tail; }
