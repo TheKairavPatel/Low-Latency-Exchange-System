@@ -4,6 +4,7 @@
 #include <vector>
 #include <algorithm>
 #include <random>
+#include <windows.h>
 #include "engine.hpp"
 
 static inline uint64_t rdtsc_start() {
@@ -54,6 +55,16 @@ struct PregenOp {
 
 int main()
 {
+
+    // ── PIN TO CORE 1 (P-core on Core Ultra 7 256V) ──
+    DWORD_PTR mask = (DWORD_PTR)1 << 1;
+    DWORD_PTR oldMask = SetThreadAffinityMask(GetCurrentThread(), mask);
+    if (oldMask == 0) {
+        printf("WARNING: SetThreadAffinityMask failed, continuing unpinned\n");
+    } else {
+        printf("pinned to core 1 (P-core)\n");
+    }
+
     initIDs();
 
     std::mt19937 rng(42);
@@ -299,8 +310,10 @@ int main()
     };
 
     // Show raw data first
+    uint64_t raw_sum = 0;
+    for (auto x : samples) raw_sum += x;
     printf("\nRAW DATA (N=%zu):\n", samples.size());
-    printf("  mean : %.2f cycles\n", (double)std::accumulate(samples.begin(), samples.end(), 0ULL) / (double)samples.size());
+    printf("  mean : %.2f cycles\n", (double)raw_sum / samples.size());
     printf("  p50  : %llu cycles\n", pct(0.50));
     printf("  p90  : %llu cycles\n", pct(0.90));
     printf("  p99  : %llu cycles\n", pct(0.99));
