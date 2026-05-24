@@ -7,16 +7,15 @@
 #include "engine.hpp"
 
 static inline uint64_t rdtsc_start() {
-    unsigned aux;
-    _mm_lfence();
-    return __rdtscp(&aux);
+    uint32_t lo, hi;
+    __asm__ volatile ("rdtsc" : "=a"(lo), "=d"(hi));
+    return ((uint64_t)hi << 32) | lo;
 }
 
 static inline uint64_t rdtsc_end() {
-    unsigned aux;
-    uint64_t t = __rdtscp(&aux);
-    _mm_lfence();
-    return t;
+    uint32_t lo, hi;
+    __asm__ volatile ("rdtsc" : "=a"(lo), "=d"(hi));
+    return ((uint64_t)hi << 32) | lo;
 }
 
 static constexpr uint32_t BASE = 74000;
