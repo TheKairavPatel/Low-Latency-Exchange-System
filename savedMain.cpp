@@ -137,18 +137,37 @@ int main()
 
     std::uniform_int_distribution<size_t> cancelDist;
 
+    // Trend with ±$3.00 bounds (3000 ticks)
+    int trend = 0;
+    static constexpr int MAX_TREND = 3000;
+    std::normal_distribution<double> trendStep(0.0, 0.1);
+
     // ── HOT LOOP ──
     for (int i = 0; i < N; i++)
     {
         PregenOp& op = ops[i];
         uint64_t s, e;
 
+        // Update trend, reflecting off the ±$3 bounds
+        int step = (int)std::round(trendStep(rng));
+        if (trend + step > MAX_TREND)
+            trend = MAX_TREND;
+        else if (trend + step < -MAX_TREND)
+            trend = -MAX_TREND;
+        else
+            trend += step;
+
+        uint32_t adjustedPrice = op.price;
+        if (op.type != CANCEL_BID && op.type != CANCEL_ASK) {
+            adjustedPrice = (uint32_t)std::max(1, std::min(200000, (int)op.price + trend));
+        }
+
         switch (op.type)
         {
             case PASSIVE_BUY:
             {
                 uint16_t id = allocID();
-                ClientOrder o = {op.price, op.qty, id, 0};
+                ClientOrder o = {adjustedPrice, op.qty, id, 0};
 
                 s = rdtsc_start();
                 engine.processOrder(o);
@@ -167,7 +186,7 @@ int main()
             case PASSIVE_SELL:
             {
                 uint16_t id = allocID();
-                ClientOrder o = {op.price, op.qty, id, 1};
+                ClientOrder o = {adjustedPrice, op.qty, id, 1};
 
                 s = rdtsc_start();
                 engine.processOrder(o);
@@ -186,7 +205,7 @@ int main()
             case AGGRESSIVE_BUY:
             {
                 uint16_t id = allocID();
-                ClientOrder o = {op.price, op.qty, id, 0};
+                ClientOrder o = {adjustedPrice, op.qty, id, 0};
 
                 s = rdtsc_start();
                 engine.processOrder(o);
@@ -201,7 +220,7 @@ int main()
             case AGGRESSIVE_SELL:
             {
                 uint16_t id = allocID();
-                ClientOrder o = {op.price, op.qty, id, 1};
+                ClientOrder o = {adjustedPrice, op.qty, id, 1};
 
                 s = rdtsc_start();
                 engine.processOrder(o);
@@ -273,24 +292,38 @@ int main()
 
     printf("benchmark done\n"); fflush(stdout);
 
-    //samples.erase(std::remove_if(samples.begin(), samples.end(),
-      //  [](uint64_t x) { return x > 10000; }), samples.end());
-
     std::sort(samples.begin(), samples.end());
-
-    uint64_t sum = 0;
-    for (auto x : samples) sum += x;
 
     auto pct = [&](double p) -> uint64_t {
         return samples[(size_t)(p * (samples.size() - 1))];
     };
 
-    printf("\nMIXED ORDER FLOW (N=%zu):\n", samples.size());
+    // Show raw data first
+    printf("\nRAW DATA (N=%zu):\n", samples.size());
+    printf("  mean : %.2f cycles\n", (double)std::accumulate(samples.begin(), samples.end(), 0ULL) / (double)samples.size());
+    printf("  p50  : %llu cycles\n", pct(0.50));
+    printf("  p90  : %llu cycles\n", pct(0.90));
+    printf("  p99  : %llu cycles\n", pct(0.99));
+    printf("  p99.9: %llu cycles\n", pct(0.999));
+    printf("  max  : %llu cycles\n", samples.back());
+
+    // Filter top 0.1% outliers
+    uint64_t cutoff = pct(0.999);
+    size_t before = samples.size();
+    samples.erase(std::remove_if(samples.begin(), samples.end(),
+        [cutoff](uint64_t x) { return x > cutoff; }), samples.end());
+    size_t removed = before - samples.size();
+
+    // Show filtered data
+    uint64_t sum = 0;
+    for (auto x : samples) sum += x;
+
+    printf("\nFILTERED (N=%zu, removed=%zu, cutoff=p99.9=%llu cycles):\n", samples.size(), removed, cutoff);
     printf("  mean : %.2f cycles\n", (double)sum / samples.size());
     printf("  p50  : %llu cycles\n", pct(0.50));
     printf("  p90  : %llu cycles\n", pct(0.90));
     printf("  p99  : %llu cycles\n", pct(0.99));
-    printf("  p999 : %llu cycles\n", pct(0.999));
+    printf("  p99.9: %llu cycles\n", pct(0.999));
     printf("  max  : %llu cycles\n", samples.back());
     printf("\nsink: %llu\n", sink);
 
