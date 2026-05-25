@@ -170,7 +170,7 @@ int main()
 
         uint32_t adjustedPrice = op.price;
         if (op.type != CANCEL_BID && op.type != CANCEL_ASK) {
-            adjustedPrice = (uint32_t)std::max(1, std::min(200000, (int)op.price + trend));
+            adjustedPrice = (uint32_t)std::max((int)BASE, std::min((int)(BASE + 2047), (int)op.price + trend));
         }
 
         switch (op.type)
