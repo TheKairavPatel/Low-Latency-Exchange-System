@@ -4,17 +4,19 @@
 #include <vector>
 #include <algorithm>
 #include <random>
-#include <windows.h>
+#include <pthread.h>
+#include <sched.h>
+#include <unistd.h>
 #include "engine.hpp"
 
 static inline uint64_t rdtsc_start() {
-    uint32_t lo, hi;
+    unsigned int lo, hi;
     __asm__ volatile ("rdtsc" : "=a"(lo), "=d"(hi));
     return ((uint64_t)hi << 32) | lo;
 }
 
 static inline uint64_t rdtsc_end() {
-    uint32_t lo, hi;
+    unsigned int lo, hi;
     __asm__ volatile ("rdtsc" : "=a"(lo), "=d"(hi));
     return ((uint64_t)hi << 32) | lo;
 }
@@ -53,17 +55,18 @@ struct PregenOp {
     uint32_t qty;
 };
 
+void pin_to_core(int core) {
+    cpu_set_t cpuset;
+    CPU_ZERO(&cpuset);
+    CPU_SET(core, &cpuset);
+    pthread_setaffinity_np(pthread_self(), sizeof(cpu_set_t), &cpuset);
+}
+
 int main()
 {
-
-    // ── PIN TO CORE 1 (P-core on Core Ultra 7 256V) ──
-    DWORD_PTR mask = (DWORD_PTR)1 << 1;
-    DWORD_PTR oldMask = SetThreadAffinityMask(GetCurrentThread(), mask);
-    if (oldMask == 0) {
-        printf("WARNING: SetThreadAffinityMask failed, continuing unpinned\n");
-    } else {
-        printf("pinned to core 1 (P-core)\n");
-    }
+    // ── PIN TO CORE 1 (P-core) ──
+    pin_to_core(1);
+    printf("pinned to core 1 (P-core)\n");
 
     initIDs();
 
@@ -170,7 +173,7 @@ int main()
 
         uint32_t adjustedPrice = op.price;
         if (op.type != CANCEL_BID && op.type != CANCEL_ASK) {
-            adjustedPrice = (uint32_t)std::max(1, std::min(200000, (int)op.price + trend));
+            adjustedPrice = (uint32_t)std::max((int)BASE, std::min((int)(BASE + 2047), (int)op.price + trend));
         }
 
         switch (op.type)
@@ -314,11 +317,11 @@ int main()
     for (auto x : samples) raw_sum += x;
     printf("\nRAW DATA (N=%zu):\n", samples.size());
     printf("  mean : %.2f cycles\n", (double)raw_sum / samples.size());
-    printf("  p50  : %llu cycles\n", pct(0.50));
-    printf("  p90  : %llu cycles\n", pct(0.90));
-    printf("  p99  : %llu cycles\n", pct(0.99));
-    printf("  p99.9: %llu cycles\n", pct(0.999));
-    printf("  max  : %llu cycles\n", samples.back());
+    printf("  p50  : %lu cycles\n", pct(0.50));
+    printf("  p90  : %lu cycles\n", pct(0.90));
+    printf("  p99  : %lu cycles\n", pct(0.99));
+    printf("  p99.9: %lu cycles\n", pct(0.999));
+    printf("  max  : %lu cycles\n", samples.back());
 
     // Filter top 0.1% outliers
     uint64_t cutoff = pct(0.999);
@@ -331,13 +334,13 @@ int main()
     uint64_t sum = 0;
     for (auto x : samples) sum += x;
 
-    printf("\nFILTERED (N=%zu, removed=%zu, cutoff=p99.9=%llu cycles):\n", samples.size(), removed, cutoff);
+    printf("\nFILTERED (N=%zu, removed=%zu, cutoff=p99.9=%lu cycles):\n", samples.size(), removed, cutoff);
     printf("  mean : %.2f cycles\n", (double)sum / samples.size());
-    printf("  p50  : %llu cycles\n", pct(0.50));
-    printf("  p90  : %llu cycles\n", pct(0.90));
-    printf("  p99  : %llu cycles\n", pct(0.99));
-    printf("  p99.9: %llu cycles\n", pct(0.999));
-    printf("  max  : %llu cycles\n", samples.back());
+    printf("  p50  : %lu cycles\n", pct(0.50));
+    printf("  p90  : %lu cycles\n", pct(0.90));
+    printf("  p99  : %lu cycles\n", pct(0.99));
+    printf("  p99.9: %lu cycles\n", pct(0.999));
+    printf("  max  : %lu cycles\n", samples.back());
     printf("\nsink: %llu\n", sink);
 
     delete[] ops;
