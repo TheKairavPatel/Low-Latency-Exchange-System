@@ -6,7 +6,7 @@ struct ClientOrder
     uint32_t price;
     uint32_t quantity;
     uint16_t orderID;
-    uint8_t type; // 0 for buy, 1 for sell, 2 for cancel
+    uint8_t type; // 0 for buy, 1 for sell, 2 for cancel, 3 for market buy, 4 for market sell
 };
 
 struct EngineOrder {

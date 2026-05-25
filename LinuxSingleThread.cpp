@@ -46,7 +46,9 @@ enum OpType : uint8_t {
     AGGRESSIVE_BUY,
     AGGRESSIVE_SELL,
     CANCEL_BID,
-    CANCEL_ASK
+    CANCEL_ASK,
+    MARKET_BUY,
+    MARKET_SELL
 };
 
 struct PregenOp {
@@ -64,7 +66,6 @@ void pin_to_core(int core) {
 
 int main()
 {
-    // ── PIN TO CORE 1 (P-core) ──
     pin_to_core(1);
     printf("pinned to core 1 (P-core)\n");
 
@@ -76,8 +77,11 @@ int main()
     std::normal_distribution<double> askOffDist(15.0, 5.0);
     std::uniform_int_distribution<uint32_t> aggOffDist(1, 5);
     std::uniform_int_distribution<uint32_t> qtyDist(1, 300);
+    std::uniform_int_distribution<uint32_t> mktQtyDist(50, 500);
 
-    std::discrete_distribution<int> opDist({35, 35, 10, 10, 5, 5});
+    // 28 passive buy, 28 passive sell, 12 agg buy, 12 agg sell,
+    // 8 cancel bid, 8 cancel ask, 2 market buy, 2 market sell
+    std::discrete_distribution<int> opDist({28, 28, 12, 12, 8, 8, 2, 2});
 
     PregenOp* ops = new PregenOp[N];
 
@@ -108,6 +112,11 @@ int main()
             case CANCEL_ASK:
                 price = 0;
                 qty = 0;
+                break;
+            case MARKET_BUY:
+            case MARKET_SELL:
+                price = 0;
+                qty = mktQtyDist(rng);
                 break;
         }
 
@@ -151,7 +160,6 @@ int main()
 
     std::uniform_int_distribution<size_t> cancelDist;
 
-    // Trend with ±$3.00 bounds (3000 ticks)
     int trend = 0;
     static constexpr int MAX_TREND = 3000;
     std::normal_distribution<double> trendStep(0.0, 0.1);
@@ -160,9 +168,8 @@ int main()
     for (int i = 0; i < N; i++)
     {
         PregenOp& op = ops[i];
-        uint64_t s, e;
+        uint64_t s, e = 0;
 
-        // Update trend, reflecting off the ±$3 bounds
         int step = (int)std::round(trendStep(rng));
         if (trend + step > MAX_TREND)
             trend = MAX_TREND;
@@ -172,7 +179,8 @@ int main()
             trend += step;
 
         uint32_t adjustedPrice = op.price;
-        if (op.type != CANCEL_BID && op.type != CANCEL_ASK) {
+        if (op.type != CANCEL_BID && op.type != CANCEL_ASK &&
+            op.type != MARKET_BUY && op.type != MARKET_SELL) {
             adjustedPrice = (uint32_t)std::max((int)BASE, std::min((int)(BASE + 2047), (int)op.price + trend));
         }
 
@@ -182,120 +190,107 @@ int main()
             {
                 uint16_t id = allocID();
                 ClientOrder o = {adjustedPrice, op.qty, id, 0};
-
                 s = rdtsc_start();
                 engine.processOrder(o);
                 e = rdtsc_end();
-
                 samples.push_back(e - s);
-
                 if (engine.getBestBid() != LEVELS)
                     liveBids.push_back(id);
                 else
                     freeID(id);
-
                 break;
             }
-
             case PASSIVE_SELL:
             {
                 uint16_t id = allocID();
                 ClientOrder o = {adjustedPrice, op.qty, id, 1};
-
                 s = rdtsc_start();
                 engine.processOrder(o);
                 e = rdtsc_end();
-
                 samples.push_back(e - s);
-
                 if (engine.getBestAsk() != LEVELS)
                     liveAsks.push_back(id);
                 else
                     freeID(id);
-
                 break;
             }
-
             case AGGRESSIVE_BUY:
             {
                 uint16_t id = allocID();
                 ClientOrder o = {adjustedPrice, op.qty, id, 0};
-
                 s = rdtsc_start();
                 engine.processOrder(o);
                 e = rdtsc_end();
-
                 samples.push_back(e - s);
-
                 freeID(id);
                 break;
             }
-
             case AGGRESSIVE_SELL:
             {
                 uint16_t id = allocID();
                 ClientOrder o = {adjustedPrice, op.qty, id, 1};
-
                 s = rdtsc_start();
                 engine.processOrder(o);
                 e = rdtsc_end();
-
                 samples.push_back(e - s);
-
                 freeID(id);
                 break;
             }
-
-            // ───────── RANDOMIZED CANCELS ─────────
-
             case CANCEL_BID:
             {
                 if (liveBids.empty()) break;
-
                 cancelDist.param(
                     std::uniform_int_distribution<size_t>::param_type(0, liveBids.size() - 1)
                 );
-
                 size_t idx = cancelDist(rng);
-
                 uint16_t id = liveBids[idx];
                 liveBids[idx] = liveBids.back();
                 liveBids.pop_back();
-
                 ClientOrder o = {0, 0, id, 2};
-
                 s = rdtsc_start();
                 engine.processOrder(o);
                 e = rdtsc_end();
-
                 samples.push_back(e - s);
-
                 freeID(id);
                 break;
             }
-
             case CANCEL_ASK:
             {
                 if (liveAsks.empty()) break;
-
                 cancelDist.param(
                     std::uniform_int_distribution<size_t>::param_type(0, liveAsks.size() - 1)
                 );
-
                 size_t idx = cancelDist(rng);
-
                 uint16_t id = liveAsks[idx];
                 liveAsks[idx] = liveAsks.back();
                 liveAsks.pop_back();
-
                 ClientOrder o = {0, 0, id, 2};
-
                 s = rdtsc_start();
                 engine.processOrder(o);
                 e = rdtsc_end();
-
                 samples.push_back(e - s);
-
+                freeID(id);
+                break;
+            }
+            case MARKET_BUY:
+            {
+                uint16_t id = allocID();
+                ClientOrder o = {0, op.qty, id, 3};
+                s = rdtsc_start();
+                engine.processOrder(o);
+                e = rdtsc_end();
+                samples.push_back(e - s);
+                freeID(id);
+                break;
+            }
+            case MARKET_SELL:
+            {
+                uint16_t id = allocID();
+                ClientOrder o = {0, op.qty, id, 4};
+                s = rdtsc_start();
+                engine.processOrder(o);
+                e = rdtsc_end();
+                samples.push_back(e - s);
                 freeID(id);
                 break;
             }
@@ -308,40 +303,37 @@ int main()
 
     std::sort(samples.begin(), samples.end());
 
-    auto pct = [&](double p) -> uint64_t {
-        return samples[(size_t)(p * (samples.size() - 1))];
+    auto pct = [&](std::vector<uint64_t>& v, double p) -> uint64_t {
+        return v[(size_t)(p * (v.size() - 1))];
     };
 
-    // Show raw data first
     uint64_t raw_sum = 0;
     for (auto x : samples) raw_sum += x;
     printf("\nRAW DATA (N=%zu):\n", samples.size());
     printf("  mean : %.2f cycles\n", (double)raw_sum / samples.size());
-    printf("  p50  : %lu cycles\n", pct(0.50));
-    printf("  p90  : %lu cycles\n", pct(0.90));
-    printf("  p99  : %lu cycles\n", pct(0.99));
-    printf("  p99.9: %lu cycles\n", pct(0.999));
+    printf("  p50  : %lu cycles\n", pct(samples, 0.50));
+    printf("  p90  : %lu cycles\n", pct(samples, 0.90));
+    printf("  p99  : %lu cycles\n", pct(samples, 0.99));
+    printf("  p99.9: %lu cycles\n", pct(samples, 0.999));
     printf("  max  : %lu cycles\n", samples.back());
 
-    // Filter top 0.1% outliers
-    uint64_t cutoff = pct(0.999);
+    uint64_t cutoff = pct(samples, 0.999);
     size_t before = samples.size();
     samples.erase(std::remove_if(samples.begin(), samples.end(),
         [cutoff](uint64_t x) { return x > cutoff; }), samples.end());
     size_t removed = before - samples.size();
 
-    // Show filtered data
     uint64_t sum = 0;
     for (auto x : samples) sum += x;
 
     printf("\nFILTERED (N=%zu, removed=%zu, cutoff=p99.9=%lu cycles):\n", samples.size(), removed, cutoff);
     printf("  mean : %.2f cycles\n", (double)sum / samples.size());
-    printf("  p50  : %lu cycles\n", pct(0.50));
-    printf("  p90  : %lu cycles\n", pct(0.90));
-    printf("  p99  : %lu cycles\n", pct(0.99));
-    printf("  p99.9: %lu cycles\n", pct(0.999));
+    printf("  p50  : %lu cycles\n", pct(samples, 0.50));
+    printf("  p90  : %lu cycles\n", pct(samples, 0.90));
+    printf("  p99  : %lu cycles\n", pct(samples, 0.99));
+    printf("  p99.9: %lu cycles\n", pct(samples, 0.999));
     printf("  max  : %lu cycles\n", samples.back());
-    printf("\nsink: %llu\n", sink);
+    printf("\nsink: %lu\n", (unsigned long)sink);
 
     delete[] ops;
     return 0;

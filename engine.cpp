@@ -152,5 +152,43 @@ void Engine::processOrder(const ClientOrder& order)
             }
             break;
         }
+        case 3: // MARKET BUY
+        { 
+            uint16_t bestAsk = getBestAsk();
+            FillResult result;
+            result.remaining = order; // initialize remaining
+
+            while (result.remaining.quantity > 0 && bestAsk != LEVELS)
+            {
+                result = sellLevels[bestAsk].fillOrder(result.remaining);
+                markFilled(result);
+                if (sellLevels[bestAsk].isEmpty())
+                {
+                    sellBitmap[bestAsk/64] &= ~(1ULL << (bestAsk % 64));
+                    bestAsk = getBestAsk();
+                }
+            }
+            // remainder is implicitly cancelled
+            break;
+        }
+        case 4: // MARKET SELL
+        {
+            uint16_t bestBid = getBestBid();
+            FillResult result;
+            result.remaining = order; // initialize remaining
+
+            while (result.remaining.quantity > 0 && bestBid != LEVELS)
+            {
+                result = buyLevels[bestBid].fillOrder(result.remaining);
+                markFilled(result);
+                if (buyLevels[bestBid].isEmpty())
+                {
+                    buyBitmap[bestBid/64] &= ~(1ULL << (bestBid % 64));
+                    bestBid = getBestBid();
+                }
+            }
+            // remainder is implicitly cancelled
+            break;
+        }
     }
 }
