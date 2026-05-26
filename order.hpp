@@ -24,9 +24,19 @@ struct GlobalOrderInfo
     bool live;
 };
 
+struct Event
+{
+    uint32_t price;
+    uint32_t quantity;
+    uint16_t orderID;
+    uint8_t type; // 0 for cancel, 1 for fill
+};
+
 struct FillResult
 {
     ClientOrder remaining;
     uint16_t filledIDs[255];
     uint8_t filledCount;
+    Event events[32];
+    uint8_t eventCount;
 };

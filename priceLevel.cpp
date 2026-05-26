@@ -61,12 +61,13 @@ void PriceLevel::cancelOrder(uint8_t slotIndex)
     }
 }
 
-FillResult PriceLevel::fillOrder(const ClientOrder& order)
+FillResult PriceLevel::fillOrder(const ClientOrder& order, uint32_t levelPrice)
 {
     uint8_t current = head;
     uint32_t remaining = order.quantity;
     FillResult result;
     result.filledCount = 0;
+    result.eventCount = 0;
     result.remaining = {order.price, remaining, order.orderID, order.type};
 
     while (current != 0xFF && remaining > 0)
@@ -81,9 +82,20 @@ FillResult PriceLevel::fillOrder(const ClientOrder& order)
         node.quantity -= fill;
         remaining -= fill;
 
+        if (result.eventCount < 32)
+        {
+            result.events[result.eventCount++] = {levelPrice, fill, node.orderID, 1}; // fill event
+        }
+        if (result.eventCount < 32)
+        {
+            result.events[result.eventCount++] = {levelPrice, fill, order.orderID, 1}; 
+        }
+
         if (node.quantity == 0)
         {
             result.filledIDs[result.filledCount++] = node.orderID; // track filled maker
+
+
             uint8_t prev = node.levelPrev;
 
             if (prev == 0xFF)
