@@ -82,11 +82,11 @@ FillResult PriceLevel::fillOrder(const ClientOrder& order, uint32_t levelPrice, 
         node.quantity -= fill;
         remaining -= fill;
 
-        if (result.eventCount < 32)
+        if (result.eventCount < 64)
         {
             result.events[result.eventCount++] = {levelPrice, fill, node.orderID, 1, side, node.quantity == 0}; // fill event
         }
-        if (result.eventCount < 32)
+        if (result.eventCount < 64)
         {
             result.events[result.eventCount++] = {levelPrice, fill, order.orderID, 1, (uint8_t)(side^1u), remaining == 0}; // fill event for incoming order
         }

@@ -1,6 +1,8 @@
 # compiled output
 engine.exe
+test.exe
 engine
+test
 
 # object files
 *.o

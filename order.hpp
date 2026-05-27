@@ -39,6 +39,6 @@ struct FillResult
     ClientOrder remaining;
     uint16_t filledIDs[255];
     uint8_t filledCount;
-    Event events[32];
+    Event events[64];
     uint8_t eventCount;
 };
