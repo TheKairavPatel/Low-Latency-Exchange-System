@@ -30,6 +30,8 @@ struct Event
     uint32_t quantity;
     uint16_t orderID;
     uint8_t type; // 0 for cancel, 1 for fill
+    uint8_t side; // 0 for buy, 1 for sell
+    bool fullyFilled;
 };
 
 struct FillResult

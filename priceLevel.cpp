@@ -13,7 +13,7 @@ PriceLevel::PriceLevel()
 
 uint8_t PriceLevel::insertOrder(const ClientOrder& order)
 {
-    if (stackTop == 255) 
+    if (stackTop == 255) [[unlikely]]
     {
         return 0xFF; // No space for new orders
     }
@@ -61,7 +61,7 @@ void PriceLevel::cancelOrder(uint8_t slotIndex)
     }
 }
 
-FillResult PriceLevel::fillOrder(const ClientOrder& order, uint32_t levelPrice)
+FillResult PriceLevel::fillOrder(const ClientOrder& order, uint32_t levelPrice, uint8_t side)
 {
     uint8_t current = head;
     uint32_t remaining = order.quantity;
@@ -84,11 +84,11 @@ FillResult PriceLevel::fillOrder(const ClientOrder& order, uint32_t levelPrice)
 
         if (result.eventCount < 32)
         {
-            result.events[result.eventCount++] = {levelPrice, fill, node.orderID, 1}; // fill event
+            result.events[result.eventCount++] = {levelPrice, fill, node.orderID, 1, side, node.quantity == 0}; // fill event
         }
         if (result.eventCount < 32)
         {
-            result.events[result.eventCount++] = {levelPrice, fill, order.orderID, 1}; 
+            result.events[result.eventCount++] = {levelPrice, fill, order.orderID, 1, (uint8_t)(side^1u), remaining == 0}; // fill event for incoming order
         }
 
         if (node.quantity == 0)

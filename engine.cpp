@@ -1,6 +1,6 @@
 #include "engine.hpp"
 #include <cstring>
-//#include <cstdio> // temp
+// #include <cstdio> // temp
 
 Engine::Engine(uint32_t basePrice) : basePrice(basePrice)
 {
@@ -51,7 +51,7 @@ void Engine::processOrder(const ClientOrder& order)
             if (bestAsk == LEVELS || orderLevel < bestAsk)
             {
                 uint8_t slotIndex = buyLevels[orderLevel].insertOrder(order);
-                if (slotIndex != 0xFF)
+                if (slotIndex != 0xFF) [[likely]]
                 {
                     globalOrderInfos[order.orderID] = {orderLevel, slotIndex, 0, true};
                     buyBitmap[orderLevel/64] |= (1ULL << (orderLevel % 64));
@@ -59,13 +59,13 @@ void Engine::processOrder(const ClientOrder& order)
             }
             else
             {
-                FillResult result = sellLevels[bestAsk].fillOrder(order, bestAsk + basePrice);
+                FillResult result = sellLevels[bestAsk].fillOrder(order, bestAsk + basePrice, 1);
                 
-                // temp print
+                //temp print
                 // for (int i = 0; i < result.eventCount; i++)
                 // {
                 //     Event& e = result.events[i];
-                //     printf("Event: %s %u @ %u (ID %u)\n", e.type == 1 ? "Fill" : "Cancel", e.quantity, e.price, e.orderID);
+                //     printf("%s %u @ $%u.%02u | ID %u | %s | %s\n", e.type == 1 ? "Fill" : "Cancel", e.quantity, e.price/100, e.price%100, e.orderID, e.side == 0 ? "Buy" : "Sell", e.fullyFilled ? "Full" : "Partial");
                 // }
 
                 markFilled(result);
@@ -87,13 +87,13 @@ void Engine::processOrder(const ClientOrder& order)
                     }
                     else
                     {
-                        result = sellLevels[bestAsk].fillOrder(result.remaining, basePrice + bestAsk);
+                        result = sellLevels[bestAsk].fillOrder(result.remaining, basePrice + bestAsk, 1);
 
                         // temp print
                         // for (int i = 0; i < result.eventCount; i++)
                         // {
                         //     Event& e = result.events[i];
-                        //     printf("Event: %s %u @ %u (ID %u)\n", e.type == 1 ? "Fill" : "Cancel", e.quantity, e.price, e.orderID);
+                        //     printf("%s %u @ $%u.%02u | ID %u | %s | %s\n", e.type == 1 ? "Fill" : "Cancel", e.quantity, e.price/100, e.price%100, e.orderID, e.side == 0 ? "Buy" : "Sell", e.fullyFilled ? "Full" : "Partial");
                         // }
 
                         markFilled(result);
@@ -112,7 +112,7 @@ void Engine::processOrder(const ClientOrder& order)
             if (bestBid == LEVELS || orderLevel > bestBid)
             {
                 uint8_t slotIndex = sellLevels[orderLevel].insertOrder(order);
-                if (slotIndex != 0xFF)
+                if (slotIndex != 0xFF) [[likely]]
                 {
                     globalOrderInfos[order.orderID] = {orderLevel, slotIndex, 1, true};
                     sellBitmap[orderLevel/64] |= (1ULL << (orderLevel % 64));
@@ -120,13 +120,13 @@ void Engine::processOrder(const ClientOrder& order)
             }
             else
             {
-                FillResult result = buyLevels[bestBid].fillOrder(order, bestBid + basePrice);
+                FillResult result = buyLevels[bestBid].fillOrder(order, bestBid + basePrice, 0);
 
                 // temp print
                 // for (int i = 0; i < result.eventCount; i++)
                 // {
                 //     Event& e = result.events[i];
-                //     printf("Event: %s %u @ %u (ID %u)\n", e.type == 1 ? "Fill" : "Cancel", e.quantity, e.price, e.orderID);
+                //     printf("%s %u @ $%u.%02u | ID %u | %s | %s\n", e.type == 1 ? "Fill" : "Cancel", e.quantity, e.price/100, e.price%100, e.orderID, e.side == 0 ? "Buy" : "Sell", e.fullyFilled ? "Full" : "Partial");
                 // }
 
                 markFilled(result);
@@ -148,13 +148,13 @@ void Engine::processOrder(const ClientOrder& order)
                     }
                     else
                     {
-                        result = buyLevels[bestBid].fillOrder(result.remaining, basePrice + bestBid);
+                        result = buyLevels[bestBid].fillOrder(result.remaining, basePrice + bestBid, 0);
 
                         // temp print
                         // for (int i = 0; i < result.eventCount; i++)
                         // {
                         //     Event& e = result.events[i];
-                        //     printf("Event: %s %u @ %u (ID %u)\n", e.type == 1 ? "Fill" : "Cancel", e.quantity, e.price, e.orderID);
+                        //     printf("%s %u @ $%u.%02u | ID %u | %s | %s\n", e.type == 1 ? "Fill" : "Cancel", e.quantity, e.price/100, e.price%100, e.orderID, e.side == 0 ? "Buy" : "Sell", e.fullyFilled ? "Full" : "Partial");
                         // }
 
                         markFilled(result);
@@ -184,7 +184,7 @@ void Engine::processOrder(const ClientOrder& order)
                     sellBitmap[priceLevel/64] &= ~(1ULL << (priceLevel % 64));
             }
             // temp print
-            Event cancelEvent = {0, 0, order.orderID, 0}; // cancel event
+            Event cancelEvent = {0, 0, order.orderID, 0, 1}; // cancel event
             // printf("Event: Cancel (ID %u)\n", cancelEvent.orderID);
             break;
         }
@@ -196,13 +196,13 @@ void Engine::processOrder(const ClientOrder& order)
 
             while (result.remaining.quantity > 0 && bestAsk != LEVELS)
             {
-                result = sellLevels[bestAsk].fillOrder(result.remaining, basePrice + bestAsk);
+                result = sellLevels[bestAsk].fillOrder(result.remaining, basePrice + bestAsk, 1);
 
                 // temp print
                 // for (int i = 0; i < result.eventCount; i++)
                 // {
                 //     Event& e = result.events[i];
-                //     printf("Event: %s %u @ %u (ID %u)\n", e.type == 1 ? "Fill" : "Cancel", e.quantity, e.price, e.orderID);
+                //     printf("%s %u @ $%u.%02u | ID %u | %s | %s\n", e.type == 1 ? "Fill" : "Cancel", e.quantity, e.price/100, e.price%100, e.orderID, e.side == 0 ? "Buy" : "Sell", e.fullyFilled ? "Full" : "Partial");
                 // }
 
                 markFilled(result);
@@ -223,12 +223,12 @@ void Engine::processOrder(const ClientOrder& order)
 
             while (result.remaining.quantity > 0 && bestBid != LEVELS)
             {
-                result = buyLevels[bestBid].fillOrder(result.remaining, basePrice + bestBid);
+                result = buyLevels[bestBid].fillOrder(result.remaining, basePrice + bestBid, 0);
                 // temp print
                 // for (int i = 0; i < result.eventCount; i++)
                 // {
                 //     Event& e = result.events[i];
-                //     printf("Event: %s %u @ %u (ID %u)\n", e.type == 1 ? "Fill" : "Cancel", e.quantity, e.price, e.orderID);
+                //     printf("%s %u @ $%u.%02u | ID %u | %s | %s\n", e.type == 1 ? "Fill" : "Cancel", e.quantity, e.price/100, e.price%100, e.orderID, e.side == 0 ? "Buy" : "Sell", e.fullyFilled ? "Full" : "Partial");
                 // }
 
                 markFilled(result);
