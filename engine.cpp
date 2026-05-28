@@ -64,7 +64,8 @@ void Engine::processOrder(const ClientOrder& order)
                 
                 for (int i = 0; i < result.eventCount; i++)
                 {
-                    outboundQueue.push(result.events[i]);
+                    if (result.events[i].fullyFilled == true)
+                        outboundQueue.push(result.events[i]);
                 }
                 markFilled(result);
                 if (sellLevels[bestAsk].isEmpty())
@@ -89,7 +90,8 @@ void Engine::processOrder(const ClientOrder& order)
 
                         for (int i = 0; i < result.eventCount; i++)
                         {
-                            outboundQueue.push(result.events[i]);
+                            if (result.events[i].fullyFilled == true)
+                                outboundQueue.push(result.events[i]);
                         }
 
                         markFilled(result);
@@ -120,7 +122,8 @@ void Engine::processOrder(const ClientOrder& order)
                         
                 for (int i = 0; i < result.eventCount; i++)
                 {
-                    outboundQueue.push(result.events[i]);
+                    if (result.events[i].fullyFilled == true)
+                        outboundQueue.push(result.events[i]);
                 }
 
                 markFilled(result);
@@ -146,7 +149,8 @@ void Engine::processOrder(const ClientOrder& order)
 
                         for (int i = 0; i < result.eventCount; i++)
                         {
-                            outboundQueue.push(result.events[i]);
+                            if (result.events[i].fullyFilled == true)
+                                outboundQueue.push(result.events[i]);
                         }
 
                         markFilled(result);
@@ -195,7 +199,8 @@ void Engine::processOrder(const ClientOrder& order)
 
                 for (int i = 0; i < result.eventCount; i++)
                 {
-                    outboundQueue.push(result.events[i]);
+                    if (result.events[i].fullyFilled == true)
+                        outboundQueue.push(result.events[i]);
                 }
 
                 markFilled(result);
@@ -219,7 +224,8 @@ void Engine::processOrder(const ClientOrder& order)
                 result = buyLevels[bestBid].fillOrder(result.remaining, basePrice + bestBid, 0);
                 for (int i = 0; i < result.eventCount; i++)
                 {
-                    outboundQueue.push(result.events[i]);
+                    if (result.events[i].fullyFilled == true)
+                        outboundQueue.push(result.events[i]);
                 }
 
                 markFilled(result);
@@ -232,5 +238,15 @@ void Engine::processOrder(const ClientOrder& order)
             // remainder is implicitly cancelled
             break;
         }
+    }
+}
+
+void Engine::run()
+{
+    ClientOrder order;
+    while (true)
+    {
+        while (inboundQueue.pop(order))
+            processOrder(order);
     }
 }

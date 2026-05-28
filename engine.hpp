@@ -1,5 +1,5 @@
 #include "priceLevel.hpp"
-#include "Outbound.hpp"
+#include "Queues.hpp"
 
 static constexpr uint32_t LEVELS = 2048;
 
@@ -13,12 +13,16 @@ class Engine
     uint64_t sellBitmap[32];
 
     public:
+    OutboundQueue outboundQueue;
+    InboundQueue inboundQueue;
     Engine(uint32_t basePrice);
     void processOrder(const ClientOrder& order);
     uint16_t getBestBid();
     uint16_t getBestAsk();
-    OutboundQueue outboundQueue;
+
+    void run();
     private:
     void markFilled(const FillResult& result);
+
     
 };
