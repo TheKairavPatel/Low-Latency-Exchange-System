@@ -78,7 +78,7 @@ void Engine::processOrder(const ClientOrder& order)
                     if (bestAsk == LEVELS || bestAsk > orderLevel)
                     {
                         uint8_t slotIndex = buyLevels[orderLevel].insertOrder(result.remaining);
-                        if (slotIndex != 0xFF)
+                        if (slotIndex != 0xFF) [[likely]]
                         {
                             globalOrderInfos[order.orderID] = {orderLevel, slotIndex, 0, true};
                             buyBitmap[orderLevel/64] |= (1ULL << (orderLevel % 64));
@@ -139,7 +139,7 @@ void Engine::processOrder(const ClientOrder& order)
                     if (bestBid == LEVELS || bestBid < orderLevel)
                     {
                         uint8_t slotIndex = sellLevels[orderLevel].insertOrder(result.remaining);
-                        if (slotIndex != 0xFF)
+                        if (slotIndex != 0xFF) [[likely]]
                         {
                             globalOrderInfos[order.orderID] = {orderLevel, slotIndex, 1, true};
                             sellBitmap[orderLevel/64] |= (1ULL << (orderLevel % 64));
