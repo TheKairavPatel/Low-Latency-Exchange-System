@@ -37,6 +37,7 @@ inline void freeID(uint16_t id) { freeIDs[--topID] = id; }
 static Engine engine(BASE);
 volatile uint64_t sink = 0;
 
+
 // ── PREGEN ──
 enum OpType : uint8_t {
     PASSIVE_BUY,
@@ -62,9 +63,19 @@ void pin_to_core(int core) {
     SetThreadPriority(thread, THREAD_PRIORITY_TIME_CRITICAL);
 }
 
+
+
 int main()
 {
     pin_to_core(1);
+    Event _drainEvent;
+    auto drain = [&]() {
+    while (engine.outboundQueue.pop(_drainEvent))
+        sink ^= _drainEvent.orderID;
+};
+
+
+
     printf("pinned to core 1 (P-core)\n");
 
     initIDs();
@@ -138,7 +149,7 @@ int main()
 
         engine.processOrder({BASE + 200 - (uint32_t)bidOff, 100, bidID, 0});
         engine.processOrder({BASE + 200 + (uint32_t)askOff, 100, askID, 1});
-
+        drain();
         warmBids.push_back(bidID);
         warmAsks.push_back(askID);
     }
@@ -191,6 +202,7 @@ int main()
                 s = rdtsc_start();
                 engine.processOrder(o);
                 e = rdtsc_end();
+                drain();
                 samples.push_back(e - s);
                 if (engine.getBestBid() != LEVELS)
                     liveBids.push_back(id);
@@ -205,6 +217,7 @@ int main()
                 s = rdtsc_start();
                 engine.processOrder(o);
                 e = rdtsc_end();
+                drain();
                 samples.push_back(e - s);
                 if (engine.getBestAsk() != LEVELS)
                     liveAsks.push_back(id);
@@ -219,6 +232,7 @@ int main()
                 s = rdtsc_start();
                 engine.processOrder(o);
                 e = rdtsc_end();
+                drain();
                 samples.push_back(e - s);
                 freeID(id);
                 break;
@@ -230,6 +244,7 @@ int main()
                 s = rdtsc_start();
                 engine.processOrder(o);
                 e = rdtsc_end();
+                drain();
                 samples.push_back(e - s);
                 freeID(id);
                 break;
@@ -248,6 +263,7 @@ int main()
                 s = rdtsc_start();
                 engine.processOrder(o);
                 e = rdtsc_end();
+                drain();
                 samples.push_back(e - s);
                 freeID(id);
                 break;
@@ -266,6 +282,7 @@ int main()
                 s = rdtsc_start();
                 engine.processOrder(o);
                 e = rdtsc_end();
+                drain();
                 samples.push_back(e - s);
                 freeID(id);
                 break;
@@ -277,6 +294,7 @@ int main()
                 s = rdtsc_start();
                 engine.processOrder(o);
                 e = rdtsc_end();
+                drain();
                 samples.push_back(e - s);
                 freeID(id);
                 break;
@@ -288,6 +306,7 @@ int main()
                 s = rdtsc_start();
                 engine.processOrder(o);
                 e = rdtsc_end();
+                drain();
                 samples.push_back(e - s);
                 freeID(id);
                 break;
