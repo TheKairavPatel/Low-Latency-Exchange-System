@@ -1,7 +1,9 @@
 #include "Outbound.hpp"
+#include <stdio.h>
 
 bool OutboundQueue::push(const Event& event)
 {
+    //printf("pushing");
     uint16_t t = (tail.load(std::memory_order_relaxed));
     uint16_t nexttail = (t+1)&0x0FFF;
     if ((nexttail == head.load(std::memory_order_acquire)))

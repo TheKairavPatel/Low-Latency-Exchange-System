@@ -9,9 +9,9 @@ class alignas(64) PriceLevel
     uint8_t stackTop;
     uint8_t head;
     uint8_t tail;
-    EngineOrder orders[255]; 
     //-----------------------------------
     public:
+    EngineOrder orders[255]; 
     //------------FUNCTIONS-------------
     PriceLevel();
     uint8_t insertOrder(const ClientOrder& order);

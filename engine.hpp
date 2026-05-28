@@ -11,13 +11,13 @@ class Engine
     GlobalOrderInfo globalOrderInfos[65536];
     uint64_t buyBitmap[32];
     uint64_t sellBitmap[32];
-    OutboundQueue outboundQueue;
 
     public:
     Engine(uint32_t basePrice);
     void processOrder(const ClientOrder& order);
     uint16_t getBestBid();
     uint16_t getBestAsk();
+    OutboundQueue outboundQueue;
     private:
     void markFilled(const FillResult& result);
     

@@ -1,6 +1,6 @@
 #include "engine.hpp"
 #include <cstring>
-// #include <cstdio> // temp
+#include <cstdio> // temp
 
 Engine::Engine(uint32_t basePrice) : basePrice(basePrice)
 {
@@ -41,6 +41,7 @@ void Engine::markFilled(const FillResult& result)
 
 void Engine::processOrder(const ClientOrder& order)
 {
+    //printf("printing");
     switch (order.type)
     {
         case 0:
@@ -61,13 +62,10 @@ void Engine::processOrder(const ClientOrder& order)
             {
                 FillResult result = sellLevels[bestAsk].fillOrder(order, bestAsk + basePrice, 1);
                 
-                //temp print
-                // for (int i = 0; i < result.eventCount; i++)
-                // {
-                //     Event& e = result.events[i];
-                //     printf("%s %u @ $%u.%02u | ID %u | %s | %s\n", e.type == 1 ? "Fill" : "Cancel", e.quantity, e.price/100, e.price%100, e.orderID, e.side == 0 ? "Buy" : "Sell", e.fullyFilled ? "Full" : "Partial");
-                // }
-
+                for (int i = 0; i < result.eventCount; i++)
+                {
+                    outboundQueue.push(result.events[i]);
+                }
                 markFilled(result);
                 if (sellLevels[bestAsk].isEmpty())
                     sellBitmap[bestAsk/64] &= ~(1ULL << (bestAsk % 64));
@@ -89,12 +87,10 @@ void Engine::processOrder(const ClientOrder& order)
                     {
                         result = sellLevels[bestAsk].fillOrder(result.remaining, basePrice + bestAsk, 1);
 
-                        // temp print
-                        // for (int i = 0; i < result.eventCount; i++)
-                        // {
-                        //     Event& e = result.events[i];
-                        //     printf("%s %u @ $%u.%02u | ID %u | %s | %s\n", e.type == 1 ? "Fill" : "Cancel", e.quantity, e.price/100, e.price%100, e.orderID, e.side == 0 ? "Buy" : "Sell", e.fullyFilled ? "Full" : "Partial");
-                        // }
+                        for (int i = 0; i < result.eventCount; i++)
+                        {
+                            outboundQueue.push(result.events[i]);
+                        }
 
                         markFilled(result);
                         if (sellLevels[bestAsk].isEmpty())
@@ -121,13 +117,11 @@ void Engine::processOrder(const ClientOrder& order)
             else
             {
                 FillResult result = buyLevels[bestBid].fillOrder(order, bestBid + basePrice, 0);
-
-                // temp print
-                // for (int i = 0; i < result.eventCount; i++)
-                // {
-                //     Event& e = result.events[i];
-                //     printf("%s %u @ $%u.%02u | ID %u | %s | %s\n", e.type == 1 ? "Fill" : "Cancel", e.quantity, e.price/100, e.price%100, e.orderID, e.side == 0 ? "Buy" : "Sell", e.fullyFilled ? "Full" : "Partial");
-                // }
+                        
+                for (int i = 0; i < result.eventCount; i++)
+                {
+                    outboundQueue.push(result.events[i]);
+                }
 
                 markFilled(result);
                 if (buyLevels[bestBid].isEmpty())
@@ -150,12 +144,10 @@ void Engine::processOrder(const ClientOrder& order)
                     {
                         result = buyLevels[bestBid].fillOrder(result.remaining, basePrice + bestBid, 0);
 
-                        // temp print
-                        // for (int i = 0; i < result.eventCount; i++)
-                        // {
-                        //     Event& e = result.events[i];
-                        //     printf("%s %u @ $%u.%02u | ID %u | %s | %s\n", e.type == 1 ? "Fill" : "Cancel", e.quantity, e.price/100, e.price%100, e.orderID, e.side == 0 ? "Buy" : "Sell", e.fullyFilled ? "Full" : "Partial");
-                        // }
+                        for (int i = 0; i < result.eventCount; i++)
+                        {
+                            outboundQueue.push(result.events[i]);
+                        }
 
                         markFilled(result);
                         if (buyLevels[bestBid].isEmpty())
@@ -170,6 +162,11 @@ void Engine::processOrder(const ClientOrder& order)
             if (!globalOrderInfos[order.orderID].live) break; // already filled, ignore
             uint16_t priceLevel = globalOrderInfos[order.orderID].priceLevel;
             uint8_t slotIndex = globalOrderInfos[order.orderID].posInArray;
+            uint32_t quantity = globalOrderInfos[order.orderID].side == 0 ? buyLevels[priceLevel].orders[slotIndex].quantity : sellLevels[priceLevel].orders[slotIndex].quantity;
+
+            Event cancelEvent = {globalOrderInfos[order.orderID].priceLevel+basePrice, quantity, order.orderID, 0, globalOrderInfos[order.orderID].side, false};
+            outboundQueue.push(cancelEvent);
+
             globalOrderInfos[order.orderID].live = false;
             if (globalOrderInfos[order.orderID].side == 0)
             {
@@ -184,8 +181,6 @@ void Engine::processOrder(const ClientOrder& order)
                     sellBitmap[priceLevel/64] &= ~(1ULL << (priceLevel % 64));
             }
             // temp print
-            Event cancelEvent = {0, 0, order.orderID, 0, 1}; // cancel event
-            // printf("Event: Cancel (ID %u)\n", cancelEvent.orderID);
             break;
         }
         case 3: // MARKET BUY
@@ -198,12 +193,10 @@ void Engine::processOrder(const ClientOrder& order)
             {
                 result = sellLevels[bestAsk].fillOrder(result.remaining, basePrice + bestAsk, 1);
 
-                // temp print
-                // for (int i = 0; i < result.eventCount; i++)
-                // {
-                //     Event& e = result.events[i];
-                //     printf("%s %u @ $%u.%02u | ID %u | %s | %s\n", e.type == 1 ? "Fill" : "Cancel", e.quantity, e.price/100, e.price%100, e.orderID, e.side == 0 ? "Buy" : "Sell", e.fullyFilled ? "Full" : "Partial");
-                // }
+                for (int i = 0; i < result.eventCount; i++)
+                {
+                    outboundQueue.push(result.events[i]);
+                }
 
                 markFilled(result);
                 if (sellLevels[bestAsk].isEmpty())
@@ -224,12 +217,10 @@ void Engine::processOrder(const ClientOrder& order)
             while (result.remaining.quantity > 0 && bestBid != LEVELS)
             {
                 result = buyLevels[bestBid].fillOrder(result.remaining, basePrice + bestBid, 0);
-                // temp print
-                // for (int i = 0; i < result.eventCount; i++)
-                // {
-                //     Event& e = result.events[i];
-                //     printf("%s %u @ $%u.%02u | ID %u | %s | %s\n", e.type == 1 ? "Fill" : "Cancel", e.quantity, e.price/100, e.price%100, e.orderID, e.side == 0 ? "Buy" : "Sell", e.fullyFilled ? "Full" : "Partial");
-                // }
+                for (int i = 0; i < result.eventCount; i++)
+                {
+                    outboundQueue.push(result.events[i]);
+                }
 
                 markFilled(result);
                 if (buyLevels[bestBid].isEmpty())
