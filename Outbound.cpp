@@ -1,15 +1,22 @@
-#include "order.hpp"
-#include <atomic>
-#include <cstdint>
+#include "Outbound.hpp"
 
-class OutboundQueue
+bool OutboundQueue::push(const Event& event)
 {
-    alignas(64) Event events[4096];
-    alignas(64) std::atomic<uint16_t> head;
-    alignas(64) std::atomic<uint16_t> tail;
+    uint16_t t = (tail.load(std::memory_order_relaxed));
+    uint16_t nexttail = (t+1)&0x0FFF;
+    if ((nexttail == head.load(std::memory_order_acquire)))
+        return false;
+    events[t] = event;
+    tail.store(nexttail, std::memory_order_release);
+    return true;
+}
 
-    public:
-    OutboundQueue() : head(0), tail(0) {}
-    bool push(const Event& event);
-    bool pop(Event& event);
-};
+bool OutboundQueue::pop(Event& event)
+{
+    uint16_t h = (head.load(std::memory_order_relaxed));
+    if (h == tail.load(std::memory_order_acquire))
+        return false;
+    event = events[h];
+    head.store((h+1)&0x0FFF, std::memory_order_release);
+    return true;
+}

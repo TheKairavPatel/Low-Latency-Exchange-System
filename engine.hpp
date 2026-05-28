@@ -1,4 +1,5 @@
 #include "priceLevel.hpp"
+#include "Outbound.hpp"
 
 static constexpr uint32_t LEVELS = 2048;
 
@@ -10,7 +11,8 @@ class Engine
     GlobalOrderInfo globalOrderInfos[65536];
     uint64_t buyBitmap[32];
     uint64_t sellBitmap[32];
-    
+    OutboundQueue outboundQueue;
+
     public:
     Engine(uint32_t basePrice);
     void processOrder(const ClientOrder& order);
