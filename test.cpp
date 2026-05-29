@@ -1,17 +1,19 @@
-#include <cstdio>
-#include <cstdint>
-#include <x86intrin.h>
-#include <vector>
-#include <algorithm>
-#include <random>
-#include <windows.h>
 #include "engine.hpp"
+#include "Gateway.hpp"
+#include <thread>
 
-static Engine engine(74000);
+std::atomic<bool> running(true);
+Engine  engine(74000, running);
+Gateway gw(engine, running);
 
-int main() 
+int main()
 {
 
+    std::thread engineThread(&Engine::run, &engine);
+    std::thread gatewayThread(&Gateway::run, &gw);
 
+    gatewayThread.join();
+    engineThread.join();
 
+    return 0;
 }
