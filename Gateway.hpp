@@ -8,7 +8,6 @@ class Gateway
     uint16_t topID;
     std::atomic<bool>& running;
 
-
     bool isEmpty() { return topID == 65535; }
 
     public:
@@ -16,4 +15,5 @@ class Gateway
     void run();
     uint16_t getID();
     void releaseID(uint16_t id);
+    ClientOrder generateRandomOrder(uint16_t id);
 };

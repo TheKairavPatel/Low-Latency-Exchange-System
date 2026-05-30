@@ -36,615 +36,197 @@ void Gateway::releaseID(uint16_t id)
     return; 
 }
 
+ClientOrder Gateway::generateRandomOrder(uint16_t id)
+{
+    static std::mt19937 rng(std::random_device{}());
+    static std::normal_distribution<double> bidOffDist(15.0, 5.0);
+    static std::normal_distribution<double> askOffDist(15.0, 5.0);
+    static std::uniform_int_distribution<uint32_t> aggOffDist(1, 5);
+    static std::uniform_int_distribution<uint32_t> qtyDist(100, 500);
+    static std::uniform_int_distribution<uint32_t> mktQtyDist(100, 500);
+    static std::discrete_distribution<int> opDist({40, 40, 10, 10, 1, 1});
+    static std::normal_distribution<double> trendStep(0.0, 0.1);
+
+    static constexpr uint32_t CENTER = 74200;
+    static int trend = 0;
+    static constexpr int MAX_TREND = 300;
+
+    int step = (int)std::round(trendStep(rng));
+    trend = std::clamp(trend + step, -MAX_TREND, MAX_TREND);
+
+    int bidOff = std::clamp((int)bidOffDist(rng), 1, 500);
+    int askOff = std::clamp((int)askOffDist(rng), 1, 500);
+
+    int op = opDist(rng);
+    uint32_t price = 0;
+    uint8_t type = 0;
+    uint32_t qty = qtyDist(rng);
+
+    switch (op)
+    {
+        case 0: // passive buy
+            price = (uint32_t)std::clamp((int)CENTER - bidOff + trend, 74000, 76047);
+            type = 0;
+            break;
+        case 1: // passive sell
+            price = (uint32_t)std::clamp((int)CENTER + askOff + trend, 74000, 76047);
+            type = 1;
+            break;
+        case 2: // aggressive buy
+            price = (uint32_t)std::clamp((int)CENTER + askOff + (int)aggOffDist(rng) + trend, 74000, 76047);
+            type = 0;
+            break;
+        case 3: // aggressive sell
+            price = (uint32_t)std::clamp((int)CENTER - bidOff - (int)aggOffDist(rng) + trend, 74000, 76047);
+            type = 1;
+            break;
+        case 4: // market buy
+            type = 3;
+            qty = mktQtyDist(rng);
+            break;
+        case 5: // market sell
+            type = 4;
+            qty = mktQtyDist(rng);
+            break;
+    }
+    return {price, qty, id, type};
+}
+
 void Gateway::run()
 {
-    printf("\n==================== COMPREHENSIVE TEST SUITE ====================\n");
-    
-    // ==================== SECTION 1: BASIC ORDER TYPES ====================
-    printf("\n========== SECTION 1: BASIC ORDER TYPES ==========\n");
-    
-    printf("\n--- 1.1: Limit Buy ---\n");
+    static constexpr int TOTAL_ORDERS = 500000;
+    static constexpr int TARGET_RATE  = 30000;
+    static constexpr uint64_t NS_PER_ORDER = 1'000'000'000ULL / TARGET_RATE;
+
+    FILE* logFile = fopen("eventslog.txt", "w");
+    fprintf(logFile, "orderID,price,quantity,type,side,fullyFilled\n");
+
+    std::vector<uint16_t> liveBids, liveAsks;
+    liveBids.reserve(65536);
+    liveAsks.reserve(65536);
+
+    auto removeID = [&](std::vector<uint16_t>& v, uint16_t id) {
+        for (size_t i = 0; i < v.size(); i++) {
+            if (v[i] == id) {
+                v[i] = v.back();
+                v.pop_back();
+                return;
+            }
+        }
+    };
+
+    std::mt19937 rng(std::random_device{}());
+    std::uniform_int_distribution<int> cancelSideDist(0, 1);
+    std::uniform_int_distribution<int> cancelRoll(0, 9);
+
+    int ordersPlaced = 0;
+
+    auto nsNow = []() -> uint64_t {
+        struct timespec ts;
+        clock_gettime(CLOCK_MONOTONIC, &ts);
+        return ts.tv_sec * 1'000'000'000ULL + ts.tv_nsec;
+    };
+
+    uint64_t nextSend = nsNow();
+
+    while (ordersPlaced < TOTAL_ORDERS)
     {
-        ClientOrder buy = {74050, 100, getID(), 0};
-        engine.inboundQueue.push(buy);
-        std::this_thread::sleep_for(std::chrono::milliseconds(50));
-        
         Event e;
-        while (engine.outboundQueue.pop(e)) {
-            printf("Event: price=%u qty=%u orderID=%u type=%u side=%u filled=%d\n", 
-                   e.price, e.quantity, e.orderID, e.type, e.side, e.fullyFilled);
-            if (e.fullyFilled) releaseID(e.orderID);
+        while (engine.outboundQueue.pop(e))
+        {
+            fprintf(logFile, "%u,%u,%u,%u,%u,%d\n",
+                    e.orderID, e.price, e.quantity, e.type, e.side, e.fullyFilled);
+            if (e.fullyFilled)
+            {
+                releaseID(e.orderID);
+                if (e.side == 0) removeID(liveBids, e.orderID);
+                else             removeID(liveAsks, e.orderID);
+            }
         }
-        printf("Result: Buy order at 74050 should be in book\n");
-    }
-    
-    printf("\n--- 1.2: Limit Sell ---\n");
-    {
-        ClientOrder sell = {74050, 50, getID(), 1};
-        engine.inboundQueue.push(sell);
-        std::this_thread::sleep_for(std::chrono::milliseconds(50));
-        
-        Event e;
-        while (engine.outboundQueue.pop(e)) {
-            printf("Event: price=%u qty=%u orderID=%u type=%u side=%u filled=%d\n", 
-                   e.price, e.quantity, e.orderID, e.type, e.side, e.fullyFilled);
-            if (e.fullyFilled) releaseID(e.orderID);
-        }
-        printf("Result: Should match with existing buy (partial fill possible)\n");
-    }
-    
-    printf("\n--- 1.3: Market Buy ---\n");
-    {
-        ClientOrder marketBuy = {0, 30, getID(), 3};
-        engine.inboundQueue.push(marketBuy);
-        std::this_thread::sleep_for(std::chrono::milliseconds(50));
-        
-        Event e;
-        while (engine.outboundQueue.pop(e)) {
-            printf("Event: price=%u qty=%u orderID=%u type=%u side=%u filled=%d\n", 
-                   e.price, e.quantity, e.orderID, e.type, e.side, e.fullyFilled);
-            if (e.fullyFilled) releaseID(e.orderID);
-        }
-    }
-    
-    printf("\n--- 1.4: Market Sell ---\n");
-    {
-        ClientOrder marketSell = {0, 20, getID(), 4};
-        engine.inboundQueue.push(marketSell);
-        std::this_thread::sleep_for(std::chrono::milliseconds(50));
-        
-        Event e;
-        while (engine.outboundQueue.pop(e)) {
-            printf("Event: price=%u qty=%u orderID=%u type=%u side=%u filled=%d\n", 
-                   e.price, e.quantity, e.orderID, e.type, e.side, e.fullyFilled);
-            if (e.fullyFilled) releaseID(e.orderID);
-        }
-    }
-    
-    // ==================== SECTION 2: PRICE LEVELS ====================
-    printf("\n========== SECTION 2: PRICE LEVEL TESTS ==========\n");
-    
-    printf("\n--- 2.1: Multiple orders at same price (Bid side) ---\n");
-    {
-        for (int i = 0; i < 10; i++) {
-            ClientOrder buy = {74100, 10, getID(), 0};
-            engine.inboundQueue.push(buy);
-        }
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
-        
-        Event e;
-        while (engine.outboundQueue.pop(e)) {
-            printf("Event: price=%u qty=%u orderID=%u type=%u side=%u filled=%d\n", 
-                   e.price, e.quantity, e.orderID, e.type, e.side, e.fullyFilled);
-            if (e.fullyFilled) releaseID(e.orderID);
-        }
-        printf("Result: 10 buy orders at 74100 should be stacked\n");
-    }
-    
-    printf("\n--- 2.2: Multiple orders at same price (Ask side) ---\n");
-    {
-        for (int i = 0; i < 10; i++) {
-            ClientOrder sell = {74100, 10, getID(), 1};
-            engine.inboundQueue.push(sell);
-        }
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
-        
-        Event e;
-        while (engine.outboundQueue.pop(e)) {
-            printf("Event: price=%u qty=%u orderID=%u type=%u side=%u filled=%d\n", 
-                   e.price, e.quantity, e.orderID, e.type, e.side, e.fullyFilled);
-            if (e.fullyFilled) releaseID(e.orderID);
-        }
-        printf("Result: Should match with existing buys\n");
-    }
-    
-    printf("\n--- 2.3: Different price levels (Bid) ---\n");
-    {
-        ClientOrder buy1 = {74080, 10, getID(), 0};
-        ClientOrder buy2 = {74090, 10, getID(), 0};
-        ClientOrder buy3 = {74100, 10, getID(), 0};
-        engine.inboundQueue.push(buy1);
-        engine.inboundQueue.push(buy2);
-        engine.inboundQueue.push(buy3);
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
-        
-        Event e;
-        while (engine.outboundQueue.pop(e)) {
-            printf("Event: price=%u qty=%u orderID=%u type=%u side=%u filled=%d\n", 
-                   e.price, e.quantity, e.orderID, e.type, e.side, e.fullyFilled);
-            if (e.fullyFilled) releaseID(e.orderID);
-        }
-    }
-    
-    printf("\n--- 2.4: Different price levels (Ask) ---\n");
-    {
-        ClientOrder sell1 = {74110, 10, getID(), 1};
-        ClientOrder sell2 = {74120, 10, getID(), 1};
-        ClientOrder sell3 = {74130, 10, getID(), 1};
-        engine.inboundQueue.push(sell1);
-        engine.inboundQueue.push(sell2);
-        engine.inboundQueue.push(sell3);
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
-        
-        Event e;
-        while (engine.outboundQueue.pop(e)) {
-            printf("Event: price=%u qty=%u orderID=%u type=%u side=%u filled=%d\n", 
-                   e.price, e.quantity, e.orderID, e.type, e.side, e.fullyFilled);
-            if (e.fullyFilled) releaseID(e.orderID);
-        }
-    }
-    
-    // ==================== SECTION 3: CANCEL TESTS ====================
-    printf("\n========== SECTION 3: CANCEL TESTS ==========\n");
-    
-    printf("\n--- 3.1: Cancel limit order before fill ---\n");
-    {
-        ClientOrder buy = {74150, 50, getID(), 0};
-        uint16_t cancelID = buy.orderID;
-        engine.inboundQueue.push(buy);
-        std::this_thread::sleep_for(std::chrono::milliseconds(50));
-        
-        ClientOrder cancel = {0, 0, cancelID, 2};
-        engine.inboundQueue.push(cancel);
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
-        
-        Event e;
-        while (engine.outboundQueue.pop(e)) {
-            printf("Event: price=%u qty=%u orderID=%u type=%u side=%u filled=%d\n", 
-                   e.price, e.quantity, e.orderID, e.type, e.side, e.fullyFilled);
-            if (e.fullyFilled) releaseID(e.orderID);
-        }
-    }
-    
-    printf("\n--- 3.2: Cancel market order (should be no-op) ---\n");
-    {
-        ClientOrder marketBuy = {0, 10, getID(), 3};
-        uint16_t cancelID = marketBuy.orderID;
-        engine.inboundQueue.push(marketBuy);
-        std::this_thread::sleep_for(std::chrono::milliseconds(50));
-        
-        ClientOrder cancel = {0, 0, cancelID, 2};
-        engine.inboundQueue.push(cancel);
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
-        
-        Event e;
-        while (engine.outboundQueue.pop(e)) {
-            printf("Event: price=%u qty=%u orderID=%u type=%u side=%u filled=%d\n", 
-                   e.price, e.quantity, e.orderID, e.type, e.side, e.fullyFilled);
-            if (e.fullyFilled) releaseID(e.orderID);
-        }
-    }
-    
-    printf("\n--- 3.3: Multiple cancels of same order ---\n");
-    {
-        ClientOrder buy = {74160, 30, getID(), 0};
-        uint16_t cancelID = buy.orderID;
-        engine.inboundQueue.push(buy);
-        std::this_thread::sleep_for(std::chrono::milliseconds(50));
-        
-        for (int i = 0; i < 3; i++) {
+
+        if (nsNow() < nextSend) continue;
+        nextSend += NS_PER_ORDER;
+
+        bool doCancel = false;
+        bool cancelSide = cancelSideDist(rng);
+        if (cancelSide == 0 && liveBids.size() > 10)
+            doCancel = true;
+        else if (cancelSide == 1 && liveAsks.size() > 10)
+            doCancel = true;
+        if (cancelRoll(rng) != 0) doCancel = false;
+
+        if (doCancel)
+        {
+            std::vector<uint16_t>& side = (cancelSide == 0) ? liveBids : liveAsks;
+            std::uniform_int_distribution<size_t> idxDist(0, side.size() - 1);
+            size_t idx = idxDist(rng);
+            uint16_t cancelID = side[idx];
+            side[idx] = side.back();
+            side.pop_back();
+
             ClientOrder cancel = {0, 0, cancelID, 2};
             engine.inboundQueue.push(cancel);
         }
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
-        
-        Event e;
-        while (engine.outboundQueue.pop(e)) {
-            printf("Event: price=%u qty=%u orderID=%u type=%u side=%u filled=%d\n", 
-                   e.price, e.quantity, e.orderID, e.type, e.side, e.fullyFilled);
-            if (e.fullyFilled) releaseID(e.orderID);
+        else
+        {
+            uint16_t id = getID();
+            if (id == 0xFFFF) continue;
+
+            ClientOrder order = generateRandomOrder(id);
+
+            if (order.type == 0) liveBids.push_back(id);
+            else if (order.type == 1) liveAsks.push_back(id);
+
+            engine.inboundQueue.push(order);
+            ordersPlaced++;
         }
-        printf("Result: Only first cancel should produce event\n");
     }
-    
-    // ==================== SECTION 4: MATCHING SCENARIOS ====================
-    printf("\n========== SECTION 4: MATCHING SCENARIOS ==========\n");
-    
-    printf("\n--- 4.1: Exact match (buy = sell) ---\n");
+
+    // drain remaining
+    Event e;
+    while (engine.outboundQueue.pop(e))
     {
-        ClientOrder sell = {74170, 25, getID(), 1};
-        ClientOrder buy = {74170, 25, getID(), 0};
-        engine.inboundQueue.push(sell);
-        engine.inboundQueue.push(buy);
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
-        
-        Event e;
-        while (engine.outboundQueue.pop(e)) {
-            printf("Event: price=%u qty=%u orderID=%u type=%u side=%u filled=%d\n", 
-                   e.price, e.quantity, e.orderID, e.type, e.side, e.fullyFilled);
-            if (e.fullyFilled) releaseID(e.orderID);
+        fprintf(logFile, "%u,%u,%u,%u,%u,%d\n",
+                e.orderID, e.price, e.quantity, e.type, e.side, e.fullyFilled);
+        if (e.fullyFilled)
+        {
+            releaseID(e.orderID);
+            if (e.side == 0) removeID(liveBids, e.orderID);
+            else             removeID(liveAsks, e.orderID);
         }
     }
-    
-    printf("\n--- 4.2: Buy larger than sell (partial fill remainder goes to book) ---\n");
+
+    // write pretty log
+    fclose(logFile);
+
+    FILE* readBack = fopen("eventslog.txt", "r");
+    FILE* prettyFile = fopen("eventslog_pretty.txt", "w");
+
+    char lineBuf[256];
+    fgets(lineBuf, sizeof(lineBuf), readBack); // skip header
+
+    while (fgets(lineBuf, sizeof(lineBuf), readBack))
     {
-        ClientOrder sell = {74180, 15, getID(), 1};
-        ClientOrder buy = {74180, 30, getID(), 0};
-        engine.inboundQueue.push(sell);
-        engine.inboundQueue.push(buy);
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
-        
-        Event e;
-        while (engine.outboundQueue.pop(e)) {
-            printf("Event: price=%u qty=%u orderID=%u type=%u side=%u filled=%d\n", 
-                   e.price, e.quantity, e.orderID, e.type, e.side, e.fullyFilled);
-            if (e.fullyFilled) releaseID(e.orderID);
-        }
+        uint32_t orderID, price, quantity, type, side, fullyFilled;
+        sscanf(lineBuf, "%u,%u,%u,%u,%u,%u", &orderID, &price, &quantity, &type, &side, &fullyFilled);
+
+        const char* eventType;
+        if (type == 0)
+            eventType = "CANCEL      ";
+        else if (fullyFilled)
+            eventType = "FILL        ";
+        else
+            eventType = "PARTIAL FILL";
+
+        const char* sideStr = (side == 0) ? "BUY " : "SELL";
+
+        fprintf(prettyFile, "[%s] | %s | ORDER_ID: %-6u | $%u.00 | QTY: %u\n",
+                eventType, sideStr, orderID, price, quantity);
     }
-    
-    printf("\n--- 4.3: Sell larger than buy (partial fill remainder goes to book) ---\n");
-    {
-        ClientOrder buy = {74190, 20, getID(), 0};
-        ClientOrder sell = {74190, 40, getID(), 1};
-        engine.inboundQueue.push(buy);
-        engine.inboundQueue.push(sell);
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
-        
-        Event e;
-        while (engine.outboundQueue.pop(e)) {
-            printf("Event: price=%u qty=%u orderID=%u type=%u side=%u filled=%d\n", 
-                   e.price, e.quantity, e.orderID, e.type, e.side, e.fullyFilled);
-            if (e.fullyFilled) releaseID(e.orderID);
-        }
-    }
-    
-    printf("\n--- 4.4: Buy sweeps multiple ask levels ---\n");
-    {
-        ClientOrder sell1 = {74200, 10, getID(), 1};
-        ClientOrder sell2 = {74210, 10, getID(), 1};
-        ClientOrder sell3 = {74220, 10, getID(), 1};
-        ClientOrder sell4 = {74230, 10, getID(), 1};
-        ClientOrder buy = {74230, 35, getID(), 0};
-        
-        engine.inboundQueue.push(sell1);
-        engine.inboundQueue.push(sell2);
-        engine.inboundQueue.push(sell3);
-        engine.inboundQueue.push(sell4);
-        engine.inboundQueue.push(buy);
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
-        
-        Event e;
-        while (engine.outboundQueue.pop(e)) {
-            printf("Event: price=%u qty=%u orderID=%u type=%u side=%u filled=%d\n", 
-                   e.price, e.quantity, e.orderID, e.type, e.side, e.fullyFilled);
-            if (e.fullyFilled) releaseID(e.orderID);
-        }
-    }
-    
-    printf("\n--- 4.5: Sell sweeps multiple bid levels ---\n");
-    {
-        ClientOrder buy1 = {74150, 10, getID(), 0};
-        ClientOrder buy2 = {74140, 10, getID(), 0};
-        ClientOrder buy3 = {74130, 10, getID(), 0};
-        ClientOrder buy4 = {74120, 10, getID(), 0};
-        ClientOrder sell = {74120, 35, getID(), 1};
-        
-        engine.inboundQueue.push(buy1);
-        engine.inboundQueue.push(buy2);
-        engine.inboundQueue.push(buy3);
-        engine.inboundQueue.push(buy4);
-        engine.inboundQueue.push(sell);
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
-        
-        Event e;
-        while (engine.outboundQueue.pop(e)) {
-            printf("Event: price=%u qty=%u orderID=%u type=%u side=%u filled=%d\n", 
-                   e.price, e.quantity, e.orderID, e.type, e.side, e.fullyFilled);
-            if (e.fullyFilled) releaseID(e.orderID);
-        }
-    }
-    
-    // ==================== SECTION 5: MARKET ORDER SCENARIOS ====================
-    printf("\n========== SECTION 5: MARKET ORDER SCENARIOS ==========\n");
-    
-    printf("\n--- 5.1: Market buy with plenty of liquidity ---\n");
-    {
-        for (int i = 0; i < 20; i++) {
-            uint32_t price = 74250 + (i * 5);
-            ClientOrder sell = {price, 5, getID(), 1};
-            engine.inboundQueue.push(sell);
-        }
-        
-        ClientOrder marketBuy = {0, 60, getID(), 3};
-        engine.inboundQueue.push(marketBuy);
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
-        
-        Event e;
-        while (engine.outboundQueue.pop(e)) {
-            printf("Event: price=%u qty=%u orderID=%u type=%u side=%u filled=%d\n", 
-                   e.price, e.quantity, e.orderID, e.type, e.side, e.fullyFilled);
-            if (e.fullyFilled) releaseID(e.orderID);
-        }
-    }
-    
-    printf("\n--- 5.2: Market sell with plenty of liquidity ---\n");
-    {
-        for (int i = 0; i < 20; i++) {
-            uint32_t price = 74100 - (i * 5);
-            ClientOrder buy = {price, 5, getID(), 0};
-            engine.inboundQueue.push(buy);
-        }
-        
-        ClientOrder marketSell = {0, 60, getID(), 4};
-        engine.inboundQueue.push(marketSell);
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
-        
-        Event e;
-        while (engine.outboundQueue.pop(e)) {
-            printf("Event: price=%u qty=%u orderID=%u type=%u side=%u filled=%d\n", 
-                   e.price, e.quantity, e.orderID, e.type, e.side, e.fullyFilled);
-            if (e.fullyFilled) releaseID(e.orderID);
-        }
-    }
-    
-    printf("\n--- 5.3: Market buy with insufficient liquidity ---\n");
-    {
-        ClientOrder sell = {74300, 10, getID(), 1};
-        engine.inboundQueue.push(sell);
-        
-        ClientOrder marketBuy = {0, 100, getID(), 3};
-        engine.inboundQueue.push(marketBuy);
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
-        
-        Event e;
-        while (engine.outboundQueue.pop(e)) {
-            printf("Event: price=%u qty=%u orderID=%u type=%u side=%u filled=%d\n", 
-                   e.price, e.quantity, e.orderID, e.type, e.side, e.fullyFilled);
-            if (e.fullyFilled) releaseID(e.orderID);
-        }
-        printf("Result: Should fill 10, remainder 90 shown in final event\n");
-    }
-    
-    printf("\n--- 5.4: Market sell with insufficient liquidity ---\n");
-    {
-        ClientOrder buy = {74050, 10, getID(), 0};
-        engine.inboundQueue.push(buy);
-        
-        ClientOrder marketSell = {0, 100, getID(), 4};
-        engine.inboundQueue.push(marketSell);
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
-        
-        Event e;
-        while (engine.outboundQueue.pop(e)) {
-            printf("Event: price=%u qty=%u orderID=%u type=%u side=%u filled=%d\n", 
-                   e.price, e.quantity, e.orderID, e.type, e.side, e.fullyFilled);
-            if (e.fullyFilled) releaseID(e.orderID);
-        }
-    }
-    
-    printf("\n--- 5.5: Market buy on empty book ---\n");
-    {
-        ClientOrder marketBuy = {0, 50, getID(), 3};
-        engine.inboundQueue.push(marketBuy);
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
-        
-        Event e;
-        while (engine.outboundQueue.pop(e)) {
-            printf("Event: price=%u qty=%u orderID=%u type=%u side=%u filled=%d\n", 
-                   e.price, e.quantity, e.orderID, e.type, e.side, e.fullyFilled);
-            if (e.fullyFilled) releaseID(e.orderID);
-        }
-        printf("Result: Should immediately return with remainder 50\n");
-    }
-    
-    // ==================== SECTION 6: ID REUSE STRESS TEST ====================
-    printf("\n========== SECTION 6: ID REUSE STRESS TEST ==========\n");
-    
-    printf("\n--- 6.1: Reuse IDs through many cycles ---\n");
-    {
-        std::vector<uint16_t> usedIDs;
-        
-        for (int cycle = 0; cycle < 5; cycle++) {
-            printf("Cycle %d:\n", cycle);
-            
-            // Create 20 orders
-            for (int i = 0; i < 20; i++) {
-                uint32_t price = 74100 + i;
-                ClientOrder buy = {price, 5, getID(), 0};
-                usedIDs.push_back(buy.orderID);
-                engine.inboundQueue.push(buy);
-            }
-            std::this_thread::sleep_for(std::chrono::milliseconds(50));
-            
-            // Cancel them all
-            for (uint16_t id : usedIDs) {
-                ClientOrder cancel = {0, 0, id, 2};
-                engine.inboundQueue.push(cancel);
-            }
-            std::this_thread::sleep_for(std::chrono::milliseconds(100));
-            
-            // Drain events and release IDs
-            Event e;
-            while (engine.outboundQueue.pop(e)) {
-                if (e.fullyFilled) {
-                    releaseID(e.orderID);
-                }
-            }
-            
-            printf("  Cycle %d complete, IDs should be recycled\n", cycle);
-            usedIDs.clear();
-        }
-    }
-    
-    printf("\n--- 6.2: Verify IDs are actually being reused (same IDs appear again) ---\n");
-    {
-        std::set<uint16_t> firstBatch;
-        
-        // First batch
-        for (int i = 0; i < 10; i++) {
-            ClientOrder buy = {74200, 5, getID(), 0};
-            firstBatch.insert(buy.orderID);
-            engine.inboundQueue.push(buy);
-        }
-        std::this_thread::sleep_for(std::chrono::milliseconds(50));
-        
-        // Cancel first batch
-        for (uint16_t id : firstBatch) {
-            ClientOrder cancel = {0, 0, id, 2};
-            engine.inboundQueue.push(cancel);
-        }
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
-        
-        Event e;
-        while (engine.outboundQueue.pop(e)) {
-            if (e.fullyFilled) releaseID(e.orderID);
-        }
-        
-        // Second batch
-        std::set<uint16_t> secondBatch;
-        for (int i = 0; i < 10; i++) {
-            ClientOrder buy = {74200, 5, getID(), 0};
-            secondBatch.insert(buy.orderID);
-            engine.inboundQueue.push(buy);
-        }
-        std::this_thread::sleep_for(std::chrono::milliseconds(50));
-        
-        // Cancel second batch
-        for (uint16_t id : secondBatch) {
-            ClientOrder cancel = {0, 0, id, 2};
-            engine.inboundQueue.push(cancel);
-        }
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
-        
-        while (engine.outboundQueue.pop(e)) {
-            if (e.fullyFilled) releaseID(e.orderID);
-        }
-        
-        printf("First batch IDs: ");
-        for (uint16_t id : firstBatch) printf("%u ", id);
-        printf("\nSecond batch IDs: ");
-        for (uint16_t id : secondBatch) printf("%u ", id);
-        printf("\nResult: IDs should overlap (reused)\n");
-    }
-    
-    // ==================== SECTION 7: MIXED ORDER TYPES ====================
-    printf("\n========== SECTION 7: MIXED ORDER TYPES ==========\n");
-    
-    printf("\n--- 7.1: Mix of limit, market, and cancel ---\n");
-    {
-        ClientOrder sell1 = {74350, 20, getID(), 1};
-        ClientOrder sell2 = {74360, 20, getID(), 1};
-        ClientOrder buy1 = {74350, 15, getID(), 0};
-        ClientOrder marketBuy = {0, 10, getID(), 3};
-        
-        engine.inboundQueue.push(sell1);
-        engine.inboundQueue.push(sell2);
-        engine.inboundQueue.push(buy1);
-        engine.inboundQueue.push(marketBuy);
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
-        
-        Event e;
-        while (engine.outboundQueue.pop(e)) {
-            printf("Event: price=%u qty=%u orderID=%u type=%u side=%u filled=%d\n", 
-                   e.price, e.quantity, e.orderID, e.type, e.side, e.fullyFilled);
-            if (e.fullyFilled) releaseID(e.orderID);
-        }
-    }
-    
-    printf("\n--- 7.2: Cancel during partial fill scenario ---\n");
-    {
-        ClientOrder sell = {74370, 50, getID(), 1};
-        ClientOrder buy = {74370, 30, getID(), 0};
-        engine.inboundQueue.push(sell);
-        engine.inboundQueue.push(buy);
-        std::this_thread::sleep_for(std::chrono::milliseconds(50));
-        
-        // Try to cancel remaining sell
-        ClientOrder cancel = {0, 0, sell.orderID, 2};
-        engine.inboundQueue.push(cancel);
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
-        
-        Event e;
-        while (engine.outboundQueue.pop(e)) {
-            printf("Event: price=%u qty=%u orderID=%u type=%u side=%u filled=%d\n", 
-                   e.price, e.quantity, e.orderID, e.type, e.side, e.fullyFilled);
-            if (e.fullyFilled) releaseID(e.orderID);
-        }
-        printf("Result: Sell should show partial fill then cancel remainder\n");
-    }
-    
-    // ==================== SECTION 8: HIGH VOLUME BURST ====================
-    printf("\n========== SECTION 8: HIGH VOLUME BURST ==========\n");
-    
-    printf("\n--- 8.1: 1000 orders rapid fire ---\n");
-    {
-        auto start = std::chrono::steady_clock::now();
-        
-        for (int i = 0; i < 500; i++) {
-            uint32_t price = 74400 + (i % 50);
-            ClientOrder buy = {price, 1, getID(), 0};
-            ClientOrder sell = {price, 1, getID(), 1};
-            engine.inboundQueue.push(buy);
-            engine.inboundQueue.push(sell);
-        }
-        std::this_thread::sleep_for(std::chrono::milliseconds(200));
-        
-        auto end = std::chrono::steady_clock::now();
-        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
-        
-        Event e;
-        int eventCount = 0;
-        while (engine.outboundQueue.pop(e)) {
-            eventCount++;
-            if (e.fullyFilled) releaseID(e.orderID);
-        }
-        
-        printf("Result: %d events generated in %llu ms\n", eventCount, duration.count());
-    }
-    
-    // ==================== SECTION 9: PRICE LEVEL ACCUMULATION ====================
-    printf("\n========== SECTION 9: PRICE LEVEL ACCUMULATION ==========\n");
-    
-    printf("\n--- 9.1: Build deep book on one side ---\n");
-    {
-        for (uint32_t price = 74010; price <= 74990; price += 10) {
-            ClientOrder sell = {price, 5, getID(), 1};
-            engine.inboundQueue.push(sell);
-        }
-        std::this_thread::sleep_for(std::chrono::milliseconds(200));
-        
-        printf("Result: 99 price levels with 5 each = 495 sell orders\n");
-        
-        // Market buy to sweep
-        ClientOrder marketBuy = {0, 500, getID(), 3};
-        engine.inboundQueue.push(marketBuy);
-        std::this_thread::sleep_for(std::chrono::milliseconds(200));
-        
-        Event e;
-        int fillEvents = 0;
-        while (engine.outboundQueue.pop(e)) {
-            fillEvents++;
-            if (e.fullyFilled) releaseID(e.orderID);
-        }
-        printf("Result: Market buy generated %d fill events sweeping all levels\n", fillEvents);
-    }
-    
-    // ==================== SECTION 10: FINAL VERIFICATION ====================
-    printf("\n========== SECTION 10: FINAL VERIFICATION ==========\n");
-    
-    printf("\n--- 10.1: Verify engine still responsive after all tests ---\n");
-    {
-        ClientOrder sell = {74050, 10, getID(), 1};
-        ClientOrder buy = {74050, 10, getID(), 0};
-        engine.inboundQueue.push(sell);
-        engine.inboundQueue.push(buy);
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
-        
-        Event e;
-        while (engine.outboundQueue.pop(e)) {
-            printf("Event: price=%u qty=%u orderID=%u type=%u side=%u filled=%d\n", 
-                   e.price, e.quantity, e.orderID, e.type, e.side, e.fullyFilled);
-            if (e.fullyFilled) releaseID(e.orderID);
-        }
-        printf("Result: Engine still functioning correctly\n");
-    }
-    
-    printf("\n--- 10.2: Final ID stats ---\n");
-    {
-        printf("Current topID: %u\n", topID);
-        printf("Free IDs available: %u\n", 65535 - topID);
-    }
-    
-    printf("\n==================== ALL TESTS COMPLETE ====================\n");
+
+    fclose(readBack);
+    fclose(prettyFile);
+    printf("events logged to eventslog.txt\n");
+    printf("pretty log written to eventslog_pretty.txt\n");
     running.store(false, std::memory_order_relaxed);
 }

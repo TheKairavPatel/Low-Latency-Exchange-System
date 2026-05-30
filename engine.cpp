@@ -262,10 +262,55 @@ void Engine::processOrder(const ClientOrder& order)
 
 void Engine::run()
 {
+    static uint64_t samples[500000];
+    int sampleCount = 0;
+
     ClientOrder order;
     while (running.load(std::memory_order_relaxed))
     {
         while (inboundQueue.pop(order))
+        {
+            uint64_t s = __rdtsc();
             processOrder(order);
+            uint64_t e = __rdtsc();
+            if (sampleCount < 500000)
+                samples[sampleCount++] = e - s;
+        }
     }
+
+    if (sampleCount == 0) return;
+
+    std::sort(samples, samples + sampleCount);
+
+    auto pct = [&](double p) -> uint64_t {
+        return samples[(size_t)(p * (sampleCount - 1))];
+    };
+
+    uint64_t sum = 0;
+    for (int i = 0; i < sampleCount; i++) sum += samples[i];
+
+    printf("\n=== ENGINE BENCHMARK (%d samples) ===\n", sampleCount);
+    printf("  mean : %.2f cycles\n", (double)sum / sampleCount);
+    printf("  p50  : %llu cycles\n", pct(0.50));
+    printf("  p90  : %llu cycles\n", pct(0.90));
+    printf("  p99  : %llu cycles\n", pct(0.99));
+    printf("  p99.9: %llu cycles\n", pct(0.999));
+    printf("  max  : %llu cycles\n", samples[sampleCount - 1]);
+
+    uint64_t cutoff = pct(0.999);
+    int filtered = 0;
+    uint64_t filteredSum = 0;
+    for (int i = 0; i < sampleCount; i++) {
+        if (samples[i] <= cutoff) {
+            filteredSum += samples[i];
+            filtered++;
+        }
+    }
+
+    printf("\n=== FILTERED (p99.9 cutoff=%llu cycles) ===\n", cutoff);
+    printf("  mean : %.2f cycles\n", (double)filteredSum / filtered);
+    printf("  p50  : %llu cycles\n", pct(0.50));
+    printf("  p90  : %llu cycles\n", pct(0.90));
+    printf("  p99  : %llu cycles\n", pct(0.99));
+    printf("  p99.9: %llu cycles\n", pct(0.999));
 }
