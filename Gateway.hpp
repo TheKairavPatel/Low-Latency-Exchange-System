@@ -7,6 +7,8 @@ class Gateway
     uint16_t freeIDs[65536];
     uint16_t topID;
     std::atomic<bool>& running;
+    uint32_t extID[65536]; // maps internal ID to external ID for logging
+
 
     bool isEmpty() { return topID == 65535; }
 

@@ -23,7 +23,7 @@ uint16_t Gateway::getID()
 {
     if (isEmpty()) [[unlikely]]
     {
-        return 0xFFFF; // No more IDs available
+        return 0xFFFF;
     }
     topID++;
     return freeIDs[topID - 1];
@@ -33,7 +33,7 @@ void Gateway::releaseID(uint16_t id)
 {
     topID--;
     freeIDs[topID] = id;
-    return; 
+    return;
 }
 
 ClientOrder Gateway::generateRandomOrder(uint16_t id)
@@ -64,27 +64,27 @@ ClientOrder Gateway::generateRandomOrder(uint16_t id)
 
     switch (op)
     {
-        case 0: // passive buy
+        case 0:
             price = (uint32_t)std::clamp((int)CENTER - bidOff + trend, 74000, 76047);
             type = 0;
             break;
-        case 1: // passive sell
+        case 1:
             price = (uint32_t)std::clamp((int)CENTER + askOff + trend, 74000, 76047);
             type = 1;
             break;
-        case 2: // aggressive buy
+        case 2:
             price = (uint32_t)std::clamp((int)CENTER + askOff + (int)aggOffDist(rng) + trend, 74000, 76047);
             type = 0;
             break;
-        case 3: // aggressive sell
+        case 3:
             price = (uint32_t)std::clamp((int)CENTER - bidOff - (int)aggOffDist(rng) + trend, 74000, 76047);
             type = 1;
             break;
-        case 4: // market buy
+        case 4:
             type = 3;
             qty = mktQtyDist(rng);
             break;
-        case 5: // market sell
+        case 5:
             type = 4;
             qty = mktQtyDist(rng);
             break;
@@ -95,11 +95,11 @@ ClientOrder Gateway::generateRandomOrder(uint16_t id)
 void Gateway::run()
 {
     static constexpr int TOTAL_ORDERS = 500000;
-    static constexpr int TARGET_RATE  = 30000;
+    static constexpr int TARGET_RATE  = 100000;
     static constexpr uint64_t NS_PER_ORDER = 1'000'000'000ULL / TARGET_RATE;
 
     FILE* logFile = fopen("eventslog.txt", "w");
-    fprintf(logFile, "orderID,price,quantity,type,side,fullyFilled\n");
+    fprintf(logFile, "orderID,extID,price,quantity,type,side,fullyFilled\n");
 
     std::vector<uint16_t> liveBids, liveAsks;
     liveBids.reserve(65536);
@@ -116,6 +116,7 @@ void Gateway::run()
     };
 
     std::mt19937 rng(std::random_device{}());
+    std::uniform_int_distribution<uint32_t> extIDDist(0, UINT32_MAX);
     std::uniform_int_distribution<int> cancelSideDist(0, 1);
     std::uniform_int_distribution<int> cancelRoll(0, 9);
 
@@ -134,8 +135,8 @@ void Gateway::run()
         Event e;
         while (engine.outboundQueue.pop(e))
         {
-            fprintf(logFile, "%u,%u,%u,%u,%u,%d\n",
-                    e.orderID, e.price, e.quantity, e.type, e.side, e.fullyFilled);
+            fprintf(logFile, "%u,%u,%u,%u,%u,%u,%d\n",
+                    e.orderID, extID[e.orderID], e.price, e.quantity, e.type, e.side, e.fullyFilled);
             if (e.fullyFilled)
             {
                 releaseID(e.orderID);
@@ -172,6 +173,8 @@ void Gateway::run()
             uint16_t id = getID();
             if (id == 0xFFFF) continue;
 
+            extID[id] = extIDDist(rng);
+
             ClientOrder order = generateRandomOrder(id);
 
             if (order.type == 0) liveBids.push_back(id);
@@ -182,12 +185,11 @@ void Gateway::run()
         }
     }
 
-    // drain remaining
     Event e;
     while (engine.outboundQueue.pop(e))
     {
-        fprintf(logFile, "%u,%u,%u,%u,%u,%d\n",
-                e.orderID, e.price, e.quantity, e.type, e.side, e.fullyFilled);
+        fprintf(logFile, "%u,%u,%u,%u,%u,%u,%d\n",
+                e.orderID, extID[e.orderID], e.price, e.quantity, e.type, e.side, e.fullyFilled);
         if (e.fullyFilled)
         {
             releaseID(e.orderID);
@@ -195,38 +197,7 @@ void Gateway::run()
             else             removeID(liveAsks, e.orderID);
         }
     }
-
-    // write pretty log
     fclose(logFile);
-
-    FILE* readBack = fopen("eventslog.txt", "r");
-    FILE* prettyFile = fopen("eventslog_pretty.txt", "w");
-
-    char lineBuf[256];
-    fgets(lineBuf, sizeof(lineBuf), readBack); // skip header
-
-    while (fgets(lineBuf, sizeof(lineBuf), readBack))
-    {
-        uint32_t orderID, price, quantity, type, side, fullyFilled;
-        sscanf(lineBuf, "%u,%u,%u,%u,%u,%u", &orderID, &price, &quantity, &type, &side, &fullyFilled);
-
-        const char* eventType;
-        if (type == 0)
-            eventType = "CANCEL      ";
-        else if (fullyFilled)
-            eventType = "FILL        ";
-        else
-            eventType = "PARTIAL FILL";
-
-        const char* sideStr = (side == 0) ? "BUY " : "SELL";
-
-        fprintf(prettyFile, "[%s] | %s | ORDER_ID: %-6u | $%u.00 | QTY: %u\n",
-                eventType, sideStr, orderID, price, quantity);
-    }
-
-    fclose(readBack);
-    fclose(prettyFile);
     printf("events logged to eventslog.txt\n");
-    printf("pretty log written to eventslog_pretty.txt\n");
     running.store(false, std::memory_order_relaxed);
 }

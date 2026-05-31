@@ -33,8 +33,8 @@ inline void initIDs() {
 
 inline uint16_t allocID() { return freeIDs[topID++]; }
 inline void freeID(uint16_t id) { freeIDs[--topID] = id; }
-
-static Engine engine(BASE);
+static std::atomic<bool> running(true);
+static Engine engine(BASE, running);
 volatile uint64_t sink = 0;
 
 

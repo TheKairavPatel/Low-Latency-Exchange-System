@@ -3,6 +3,8 @@ engine.exe
 test.exe
 engine
 test
+eventslog.txt
+eventslog_pretty.txt
 
 # object files
 *.o
