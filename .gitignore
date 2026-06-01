@@ -5,6 +5,7 @@ engine
 test
 eventslog.txt
 eventslog_pretty.txt
+bench
 
 # object files
 *.o
@@ -15,3 +16,5 @@ eventslog_pretty.txt
 
 # build artifacts
 *.out
+
+*.exe

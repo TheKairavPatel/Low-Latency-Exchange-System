@@ -1,5 +1,5 @@
+
 #include "Queues.hpp"
-#include <stdio.h>
 
 bool OutboundQueue::push(const Event& event)
 {

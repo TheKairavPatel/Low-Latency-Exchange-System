@@ -47,11 +47,11 @@ int main()
 
         const char* eventType;
         if (type == 0)
-            eventType = "CANCEL      ";
+            eventType = "   CANCEL   ";
         else if (type == 1 && price == 0 && fullyFilled)
-            eventType = quantity == 0 ? "MKT FILLED  " : "MKT PARTIAL ";
+            eventType = quantity == 0 ? " MKT FILLED " : "MKT PARTIAL ";
         else if (fullyFilled)
-            eventType = "FILL        ";
+            eventType = "    FILL    ";
         else
             eventType = "PARTIAL FILL";
 
