@@ -38,7 +38,7 @@ int main()
     FILE* prettyFile = fopen("eventslog_pretty.txt", "w");
 
     char lineBuf[256];
-    fgets(lineBuf, sizeof(lineBuf), readBack);
+    (void)fgets(lineBuf, sizeof(lineBuf), readBack);
 
     while (fgets(lineBuf, sizeof(lineBuf), readBack))
     {

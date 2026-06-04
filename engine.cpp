@@ -291,11 +291,11 @@ void Engine::run()
 
     printf("\n=== ENGINE BENCHMARK (%d samples) ===\n", sampleCount);
     printf("  mean : %.2f cycles\n", (double)sum / sampleCount);
-    printf("  p50  : %llu cycles\n", pct(0.50));
-    printf("  p90  : %llu cycles\n", pct(0.90));
-    printf("  p99  : %llu cycles\n", pct(0.99));
-    printf("  p99.9: %llu cycles\n", pct(0.999));
-    printf("  max  : %llu cycles\n", samples[sampleCount - 1]);
+    printf("  p50  : %lu cycles\n", pct(0.50));
+    printf("  p90  : %lu cycles\n", pct(0.90));
+    printf("  p99  : %lu cycles\n", pct(0.99));
+    printf("  p99.9: %lu cycles\n", pct(0.999));
+    printf("  max  : %lu cycles\n", samples[sampleCount - 1]);
 
     uint64_t cutoff = pct(0.999);
     int filtered = 0;
@@ -307,10 +307,10 @@ void Engine::run()
         }
     }
 
-    printf("\n=== FILTERED (p99.9 cutoff=%llu cycles) ===\n", cutoff);
+    printf("\n=== FILTERED (p99.9 cutoff=%lu cycles) ===\n", cutoff);
     printf("  mean : %.2f cycles\n", (double)filteredSum / filtered);
-    printf("  p50  : %llu cycles\n", pct(0.50));
-    printf("  p90  : %llu cycles\n", pct(0.90));
-    printf("  p99  : %llu cycles\n", pct(0.99));
-    printf("  p99.9: %llu cycles\n", pct(0.999));
+    printf("  p50  : %lu cycles\n", pct(0.50));
+    printf("  p90  : %lu cycles\n", pct(0.90));
+    printf("  p99  : %lu cycles\n", pct(0.99));
+    printf("  p99.9: %lu cycles\n", pct(0.999));
 }
