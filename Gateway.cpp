@@ -46,16 +46,16 @@ ClientOrder Gateway::generateRandomOrder(uint16_t id)
     static std::normal_distribution<double> bidOffDist(15.0, 5.0);
     static std::normal_distribution<double> askOffDist(15.0, 5.0);
     static std::uniform_int_distribution<uint32_t> aggOffDist(1, 5);
-    static std::uniform_int_distribution<uint32_t> qtyDist(100, 500);
-    static std::uniform_int_distribution<uint32_t> mktQtyDist(100, 500);
+    static std::lognormal_distribution<double> qtyDist(3.8, 1.0);
+    static std::lognormal_distribution<double> mktQtyDist(3.8, 1.0);
     static std::discrete_distribution<int> opDist({40, 40, 10, 10, 1, 1});
-    static std::normal_distribution<double> trendStep(0.0, 0.1);
+    static std::uniform_int_distribution<int> trendStep(-1, 1);
 
     static constexpr uint32_t CENTER = 74200;
     static int trend = 0;
-    static constexpr int MAX_TREND = 300;
+    static constexpr int MAX_TREND = 150;
 
-    int step = (int)std::round(trendStep(rng));
+    int step = trendStep(rng);
     trend = std::clamp(trend + step, -MAX_TREND, MAX_TREND);
 
     int bidOff = std::clamp((int)bidOffDist(rng), 1, 500);
@@ -64,7 +64,7 @@ ClientOrder Gateway::generateRandomOrder(uint16_t id)
     int op = opDist(rng);
     uint32_t price = 0;
     uint8_t type = 0;
-    uint32_t qty = qtyDist(rng);
+    uint16_t qty = (uint16_t)std::clamp((int)qtyDist(rng), 5, 2000);
 
     switch (op)
     {
@@ -86,11 +86,11 @@ ClientOrder Gateway::generateRandomOrder(uint16_t id)
             break;
         case 4:
             type = 3;
-            qty = mktQtyDist(rng);
+            qty = (uint16_t)std::clamp((int)mktQtyDist(rng), 5, 2000);
             break;
         case 5:
             type = 4;
-            qty = mktQtyDist(rng);
+            qty = (uint16_t)std::clamp((int)mktQtyDist(rng), 5, 2000);
             break;
     }
     return {price, qty, id, type};

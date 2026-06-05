@@ -184,7 +184,7 @@ void Engine::processOrder(const ClientOrder& order)
             if (!globalOrderInfos[order.orderID].live) break; // already filled, ignore
             uint16_t priceLevel = globalOrderInfos[order.orderID].priceLevel;
             uint8_t slotIndex = globalOrderInfos[order.orderID].posInArray;
-            uint32_t quantity = globalOrderInfos[order.orderID].side == 0 ? buyLevels[priceLevel].orders[slotIndex].quantity : sellLevels[priceLevel].orders[slotIndex].quantity;
+            uint16_t quantity = globalOrderInfos[order.orderID].side == 0 ? buyLevels[priceLevel].orders[slotIndex].quantity : sellLevels[priceLevel].orders[slotIndex].quantity;
 
             Event cancelEvent = {globalOrderInfos[order.orderID].priceLevel+basePrice, quantity, order.orderID, 0, globalOrderInfos[order.orderID].side, true};
             outboundQueue.push(cancelEvent);

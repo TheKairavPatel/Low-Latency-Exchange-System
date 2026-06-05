@@ -64,7 +64,7 @@ void PriceLevel::cancelOrder(uint8_t slotIndex)
 FillResult PriceLevel::fillOrder(const ClientOrder& order, uint32_t levelPrice, uint8_t side)
 {
     uint8_t current = head;
-    uint32_t remaining = order.quantity;
+    uint16_t remaining = order.quantity;
     FillResult result;
     result.filledCount = 0;
     result.eventCount = 0;
@@ -75,7 +75,7 @@ FillResult PriceLevel::fillOrder(const ClientOrder& order, uint32_t levelPrice, 
         EngineOrder &node = orders[current];
         uint8_t next = node.levelNext;
 
-        uint32_t fill = (remaining < node.quantity)
+        uint16_t fill = (remaining < node.quantity)
                         ? remaining
                         : node.quantity;
 
