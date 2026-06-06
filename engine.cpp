@@ -1,49 +1,38 @@
 #include "engine.hpp"
 #include <cstring>
-#include <cstdio> // temp
-#include <x86intrin.h> 
-#include <algorithm> // temp
+#include <cstdio>
+#include <x86intrin.h>
+#include <algorithm>
 
-Engine::Engine(uint32_t basePrice, std::atomic<bool> &running) : basePrice(basePrice), running(running)
+Engine::Engine(uint32_t basePrice, std::atomic<bool>& running) : basePrice(basePrice), running(running)
 {
     memset(buyBitmap, 0, sizeof(buyBitmap));
     memset(sellBitmap, 0, sizeof(sellBitmap));
     memset(globalOrderInfos, 0, sizeof(globalOrderInfos));
 }
 
-uint16_t Engine::getBestAsk() // returns lowest price level with available sell orders
+uint16_t Engine::getBestAsk()
 {
     for (int i = 0; i < 32; i++)
     {
         if (sellBitmap[i] != 0)
-        {
             return i*64 + __builtin_ctzll(sellBitmap[i]);
-        }
     }
-    return LEVELS; // No asks available
+    return LEVELS;
 }
 
-uint16_t Engine::getBestBid() // returns highest price level with available buy orders
+uint16_t Engine::getBestBid()
 {
     for (int i = 31; i >= 0; i--)
     {
         if (buyBitmap[i] != 0)
-        {
             return i*64 + (63 - __builtin_clzll(buyBitmap[i]));
-        }
     }
-    return LEVELS; // No bids available
-}
-
-void Engine::markFilled(const FillResult& result)
-{
-    for (int i = 0; i < result.filledCount; i++)
-        globalOrderInfos[result.filledIDs[i]].live = false;
+    return LEVELS;
 }
 
 void Engine::processOrder(const ClientOrder& order)
 {
-    //printf("printing");
     switch (order.type)
     {
         case 0:
@@ -56,7 +45,7 @@ void Engine::processOrder(const ClientOrder& order)
                 uint8_t slotIndex = buyLevels[orderLevel].insertOrder(order);
                 if (slotIndex == 0xFF) [[unlikely]]
                 {
-                    Event rejectEvent = {order.price, order.quantity, order.orderID, 0, uint8_t((order.type == 0 || order.type == 3) ? 0 : 1), true};
+                    Event rejectEvent = {order.price, order.quantity, order.orderID, 0, 0, true};
                     outboundQueue.push(rejectEvent);
                 }
                 else
@@ -67,13 +56,9 @@ void Engine::processOrder(const ClientOrder& order)
             }
             else
             {
-                FillResult result = sellLevels[bestAsk].fillOrder(order, bestAsk + basePrice, 1);
-                
+                FillResult result = sellLevels[bestAsk].fillOrder(order, bestAsk + basePrice, 1, globalOrderInfos);
                 for (int i = 0; i < result.eventCount; i++)
-                {
                     outboundQueue.push(result.events[i]);
-                }
-                markFilled(result);
                 if (sellLevels[bestAsk].isEmpty())
                     sellBitmap[bestAsk/64] &= ~(1ULL << (bestAsk % 64));
 
@@ -85,7 +70,7 @@ void Engine::processOrder(const ClientOrder& order)
                         uint8_t slotIndex = buyLevels[orderLevel].insertOrder(result.remaining);
                         if (slotIndex == 0xFF) [[unlikely]]
                         {
-                            Event rejectEvent = {result.remaining.price, result.remaining.quantity, result.remaining.orderID, 0, uint8_t((order.type == 0 || order.type == 3) ? 0 : 1), true};
+                            Event rejectEvent = {result.remaining.price, result.remaining.quantity, result.remaining.orderID, 0, 0, true};
                             outboundQueue.push(rejectEvent);
                         }
                         else
@@ -97,14 +82,9 @@ void Engine::processOrder(const ClientOrder& order)
                     }
                     else
                     {
-                        result = sellLevels[bestAsk].fillOrder(result.remaining, basePrice + bestAsk, 1);
-
+                        result = sellLevels[bestAsk].fillOrder(result.remaining, basePrice + bestAsk, 1, globalOrderInfos);
                         for (int i = 0; i < result.eventCount; i++)
-                        {
-                                outboundQueue.push(result.events[i]);
-                        }
-
-                        markFilled(result);
+                            outboundQueue.push(result.events[i]);
                         if (sellLevels[bestAsk].isEmpty())
                             sellBitmap[bestAsk/64] &= ~(1ULL << (bestAsk % 64));
                     }
@@ -122,7 +102,7 @@ void Engine::processOrder(const ClientOrder& order)
                 uint8_t slotIndex = sellLevels[orderLevel].insertOrder(order);
                 if (slotIndex == 0xFF) [[unlikely]]
                 {
-                    Event rejectEvent = {order.price, order.quantity, order.orderID, 0, uint8_t((order.type == 0 || order.type == 3) ? 0 : 1), true};
+                    Event rejectEvent = {order.price, order.quantity, order.orderID, 0, 1, true};
                     outboundQueue.push(rejectEvent);
                 }
                 else
@@ -133,14 +113,9 @@ void Engine::processOrder(const ClientOrder& order)
             }
             else
             {
-                FillResult result = buyLevels[bestBid].fillOrder(order, bestBid + basePrice, 0);
-                        
+                FillResult result = buyLevels[bestBid].fillOrder(order, bestBid + basePrice, 0, globalOrderInfos);
                 for (int i = 0; i < result.eventCount; i++)
-                {
                     outboundQueue.push(result.events[i]);
-                }
-
-                markFilled(result);
                 if (buyLevels[bestBid].isEmpty())
                     buyBitmap[bestBid/64] &= ~(1ULL << (bestBid % 64));
 
@@ -152,7 +127,7 @@ void Engine::processOrder(const ClientOrder& order)
                         uint8_t slotIndex = sellLevels[orderLevel].insertOrder(result.remaining);
                         if (slotIndex == 0xFF) [[unlikely]]
                         {
-                            Event rejectEvent = {result.remaining.price, result.remaining.quantity, result.remaining.orderID, 0, uint8_t((order.type == 0 || order.type == 3) ? 0 : 1), true};
+                            Event rejectEvent = {result.remaining.price, result.remaining.quantity, result.remaining.orderID, 0, 1, true};
                             outboundQueue.push(rejectEvent);
                         }
                         else
@@ -164,14 +139,9 @@ void Engine::processOrder(const ClientOrder& order)
                     }
                     else
                     {
-                        result = buyLevels[bestBid].fillOrder(result.remaining, basePrice + bestBid, 0);
-
+                        result = buyLevels[bestBid].fillOrder(result.remaining, basePrice + bestBid, 0, globalOrderInfos);
                         for (int i = 0; i < result.eventCount; i++)
-                        {
                             outboundQueue.push(result.events[i]);
-                        }
-
-                        markFilled(result);
                         if (buyLevels[bestBid].isEmpty())
                             buyBitmap[bestBid/64] &= ~(1ULL << (bestBid % 64));
                     }
@@ -181,16 +151,20 @@ void Engine::processOrder(const ClientOrder& order)
         }
         case 2: // CANCEL
         {
-            if (!globalOrderInfos[order.orderID].live) break; // already filled, ignore
-            uint16_t priceLevel = globalOrderInfos[order.orderID].priceLevel;
-            uint8_t slotIndex = globalOrderInfos[order.orderID].posInArray;
-            uint16_t quantity = globalOrderInfos[order.orderID].side == 0 ? buyLevels[priceLevel].orders[slotIndex].quantity : sellLevels[priceLevel].orders[slotIndex].quantity;
+            auto& info = globalOrderInfos[order.orderID];
+            if (!info.live) break;
+            uint16_t priceLevel = info.priceLevel;
+            uint8_t slotIndex = info.posInArray;
+            uint8_t side = info.side;
+            uint16_t quantity = side == 0
+                ? buyLevels[priceLevel].orders[slotIndex].quantity
+                : sellLevels[priceLevel].orders[slotIndex].quantity;
 
-            Event cancelEvent = {globalOrderInfos[order.orderID].priceLevel+basePrice, quantity, order.orderID, 0, globalOrderInfos[order.orderID].side, true};
+            Event cancelEvent = {priceLevel + basePrice, quantity, order.orderID, 0, side, true};
             outboundQueue.push(cancelEvent);
+            info.live = false;
 
-            globalOrderInfos[order.orderID].live = false;
-            if (globalOrderInfos[order.orderID].side == 0)
+            if (side == 0)
             {
                 buyLevels[priceLevel].cancelOrder(slotIndex);
                 if (buyLevels[priceLevel].isEmpty())
@@ -202,25 +176,19 @@ void Engine::processOrder(const ClientOrder& order)
                 if (sellLevels[priceLevel].isEmpty())
                     sellBitmap[priceLevel/64] &= ~(1ULL << (priceLevel % 64));
             }
-            // temp print
             break;
         }
         case 3: // MARKET BUY
-        { 
+        {
             uint16_t bestAsk = getBestAsk();
             FillResult result;
-            result.remaining = order; // initialize remaining
+            result.remaining = order;
 
             while (result.remaining.quantity > 0 && bestAsk != LEVELS)
             {
-                result = sellLevels[bestAsk].fillOrder(result.remaining, basePrice + bestAsk, 1);
-
+                result = sellLevels[bestAsk].fillOrder(result.remaining, basePrice + bestAsk, 1, globalOrderInfos);
                 for (int i = 0; i < result.eventCount; i++)
-                {
                     outboundQueue.push(result.events[i]);
-                }
-
-                markFilled(result);
                 if (sellLevels[bestAsk].isEmpty())
                 {
                     sellBitmap[bestAsk/64] &= ~(1ULL << (bestAsk % 64));
@@ -235,24 +203,19 @@ void Engine::processOrder(const ClientOrder& order)
         {
             uint16_t bestBid = getBestBid();
             FillResult result;
-            result.remaining = order; // initialize remaining
+            result.remaining = order;
 
             while (result.remaining.quantity > 0 && bestBid != LEVELS)
             {
-                result = buyLevels[bestBid].fillOrder(result.remaining, basePrice + bestBid, 0);
+                result = buyLevels[bestBid].fillOrder(result.remaining, basePrice + bestBid, 0, globalOrderInfos);
                 for (int i = 0; i < result.eventCount; i++)
-                {
                     outboundQueue.push(result.events[i]);
-                }
-
-                markFilled(result);
                 if (buyLevels[bestBid].isEmpty())
                 {
                     buyBitmap[bestBid/64] &= ~(1ULL << (bestBid % 64));
                     bestBid = getBestBid();
                 }
             }
-            // remainder is implicitly cancelled
             Event marketDoneEvent = {order.price, result.remaining.quantity, order.orderID, 1, 1, true};
             outboundQueue.push(marketDoneEvent);
             break;

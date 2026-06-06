@@ -15,7 +15,7 @@ class alignas(64) PriceLevel
     //------------FUNCTIONS-------------
     PriceLevel();
     uint8_t insertOrder(const ClientOrder& order);
-    FillResult fillOrder(const ClientOrder& order, uint32_t levelPrice, uint8_t side); // returns remaining + filled IDs
+    FillResult fillOrder(const ClientOrder& order, uint32_t levelPrice, uint8_t side, GlobalOrderInfo* infos);
     void cancelOrder(uint8_t slotIndex); 
     uint8_t getHead() const { return head; }
     uint8_t getTail() const { return tail; }
