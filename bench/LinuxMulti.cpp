@@ -7,7 +7,7 @@
 
 std::atomic<bool> running(true);
 Engine  engine(74000, running);
-Gateway gw(engine, running);
+Gateway gw(engine, running, true, 500'000);
 
 void pinThread(std::thread& t, int core)
 {

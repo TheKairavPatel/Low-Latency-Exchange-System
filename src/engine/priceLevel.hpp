@@ -12,6 +12,7 @@ class alignas(64) PriceLevel
     //-----------------------------------
     public:
     EngineOrder orders[255]; 
+    uint32_t totalQuantity; // total quantity at this price level, updated on insert, fill, and cancel
     //------------FUNCTIONS-------------
     PriceLevel();
     uint8_t insertOrder(const ClientOrder& order);

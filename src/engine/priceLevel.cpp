@@ -9,6 +9,7 @@ PriceLevel::PriceLevel()
     {
         freeIndexes[i] = (uint8_t)i;
     }
+    totalQuantity = 0;
 }
 
 uint8_t PriceLevel::insertOrder(const ClientOrder& order)
@@ -23,6 +24,7 @@ uint8_t PriceLevel::insertOrder(const ClientOrder& order)
     orders[newIndex].orderID = order.orderID;
     orders[newIndex].levelNext = 0xFF;
     orders[newIndex].levelPrev = 0xFF;
+    totalQuantity += order.quantity;
 
     if (head == 0xFF) 
     {
@@ -43,6 +45,7 @@ void PriceLevel::cancelOrder(uint8_t slotIndex)
     uint8_t nextIndex = orders[slotIndex].levelNext;
     stackTop--;
     freeIndexes[stackTop] = slotIndex; 
+    totalQuantity -= orders[slotIndex].quantity;
     if (prevIndex == 0xFF)
     {
         head = nextIndex;
@@ -78,6 +81,7 @@ FillResult PriceLevel::fillOrder(const ClientOrder& order, uint32_t levelPrice, 
 
         node.quantity -= fill;
         remaining -= fill;
+        totalQuantity -= fill;
 
         if (result.eventCount < 64) [[likely]]
         {

@@ -10,10 +10,10 @@ linux-multi:
 	$(CXX) $(FLAGS) -o build/LinuxMulti $(SRCS) bench/LinuxMulti.cpp -lpthread
 
 linux-single:
-	$(CXX) $(FLAGS) -o build/LinuxSingle $(SRCS) bench/LinuxSingleThread.cpp -lpthread
+	$(CXX) $(FLAGS) -o build/LinuxSingle $(SRCS) bench/LinuxSingle.cpp -lpthread
 
 windows-single:
-	$(CXX) $(FLAGS) -o build/WindowsSingle $(SRCS) bench/WindowsSingleThread.cpp -lpthread
+	$(CXX) $(FLAGS) -o build/WindowsSingle $(SRCS) bench/WindowsSingle.cpp -lpthread
 
 tests:
 	$(CXX) $(FLAGS) -o build/test $(SRCS) tests/test.cpp -lpthread

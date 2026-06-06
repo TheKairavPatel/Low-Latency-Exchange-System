@@ -8,7 +8,7 @@
 // The Gateway class simulates a client interface that generates random orders and sends them to the Engine, while also processing events coming back from the Engine.
 
 // Set up free ID list and set free pointer to index 0 (indicating all IDs are free)
-Gateway::Gateway(Engine& engine, std::atomic<bool> &running) : engine(engine), running(running)
+Gateway::Gateway(Engine& engine, std::atomic<bool> &running, bool logging, uint32_t qtysim) : engine(engine), running(running), logging(logging), totalOrders(qtysim)
 {
     topID = 0;
     for (uint16_t i = 0; i < 65535; i++)
@@ -94,13 +94,16 @@ ClientOrder Gateway::generateRandomOrder(uint16_t id)
 void Gateway::run()
 {
     // Setup for order generation and flow
-    static constexpr int TOTAL_ORDERS = 500000;
     static constexpr int TARGET_RATE  = 100000;
     static constexpr uint64_t NS_PER_ORDER = 1'000'000'000ULL / TARGET_RATE;
 
-    // Open log file and write header
-    FILE* logFile = fopen("logs/eventslog.txt", "w");
-    fprintf(logFile, "orderID,extID,price,quantity,type,side,fullyFilled\n");
+    // Open log file if logging enabled
+    FILE* logFile = nullptr;
+    if (logging)
+    {
+        logFile = fopen("logs/eventslog.txt", "w");
+        fprintf(logFile, "orderID,extID,price,quantity,type,side,fullyFilled\n");
+    }
 
     // Vectors to track live orders for cancellation
     std::vector<uint16_t> liveBids, liveAsks;
@@ -118,36 +121,36 @@ void Gateway::run()
         }
     };
 
-    // 
     std::mt19937 rng(std::random_device{}());
     std::uniform_int_distribution<uint32_t> extIDDist(0, UINT32_MAX);
     std::uniform_int_distribution<int> cancelSideDist(0, 1);
     std::uniform_int_distribution<int> cancelRoll(0, 9);
 
-    // Order count
-    int ordersPlaced = 0;
+    uint32_t ordersPlaced = 0;
 
     // Lambda to get current time in nanoseconds
-    auto nsNow = []() -> uint64_t 
-    {
+    auto nsNow = []() -> uint64_t {
+    #ifdef _WIN32
         using namespace std::chrono;
         return duration_cast<nanoseconds>(steady_clock::now().time_since_epoch()).count();
+    #else
+        struct timespec ts;
+        clock_gettime(CLOCK_MONOTONIC, &ts);
+        return ts.tv_sec * 1'000'000'000ULL + ts.tv_nsec;
+    #endif
     };
 
-    // Initial timestamp for sending orders
     uint64_t nextSend = nsNow();
 
-    // Main loop: process outbound events and send new orders at the target rate, with some random cancellations
-    while (ordersPlaced < TOTAL_ORDERS)
+    // Main loop: process outbound events and send new orders at the target rate
+    while (ordersPlaced < totalOrders)
     {
-        // Create event struct to hold popped events from the engine's outbound queue
         Event e;
         while (engine.outboundQueue.pop(e))
         {
-            // Log the event to the file
-            fprintf(logFile, "%u,%u,%u,%u,%u,%u,%d\n",
-                    e.orderID, extID[e.orderID], e.price, e.quantity, e.type, e.side, e.fullyFilled);
-            // If the event indicates the order was fully filled, release the ID and remove it from live tracking
+            if (logging)
+                fprintf(logFile, "%u,%u,%u,%u,%u,%u,%d\n",
+                        e.orderID, extID[e.orderID], e.price, e.quantity, e.type, e.side, e.fullyFilled);
             if (e.fullyFilled)
             {
                 releaseID(e.orderID);
@@ -156,11 +159,9 @@ void Gateway::run()
             }
         }
 
-        // Check if it's time to send the next order
         if (nsNow() < nextSend) continue;
         nextSend += NS_PER_ORDER;
 
-        // Randomly decide whether to send a new order or cancel an existing one, with cancellations being less frequent
         bool doCancel = false;
         bool cancelSide = cancelSideDist(rng);
         if (cancelSide == 0 && liveBids.size() > 10)
@@ -171,7 +172,6 @@ void Gateway::run()
 
         if (doCancel)
         {
-            // Choose a random order from the appropriate side to cancel
             std::vector<uint16_t>& side = (cancelSide == 0) ? liveBids : liveAsks;
             std::uniform_int_distribution<size_t> idxDist(0, side.size() - 1);
             size_t idx = idxDist(rng);
@@ -184,11 +184,10 @@ void Gateway::run()
         }
         else
         {
-            // Generate a new order and send it to the engine, unless no IDs are available
             uint16_t id = getID();
             if (id == 0xFFFF) continue;
 
-            extID[id] = extIDDist(rng);
+            if (logging) extID[id] = extIDDist(rng);
 
             ClientOrder order = generateRandomOrder(id);
 
@@ -200,12 +199,13 @@ void Gateway::run()
         }
     }
 
-    // After main loop, continue processing outbound events until the engine is done
+    // Drain remaining events
     Event e;
     while (engine.outboundQueue.pop(e))
     {
-        fprintf(logFile, "%u,%u,%u,%u,%u,%u,%d\n",
-                e.orderID, extID[e.orderID], e.price, e.quantity, e.type, e.side, e.fullyFilled);
+        if (logging)
+            fprintf(logFile, "%u,%u,%u,%u,%u,%u,%d\n",
+                    e.orderID, extID[e.orderID], e.price, e.quantity, e.type, e.side, e.fullyFilled);
         if (e.fullyFilled)
         {
             releaseID(e.orderID);
@@ -213,7 +213,12 @@ void Gateway::run()
             else             removeID(liveAsks, e.orderID);
         }
     }
-    fclose(logFile);
-    printf("events logged to build\\eventslog.txt\n");
-    running.store(false, std::memory_order_relaxed); // signal engine thread to stop spinning
+
+    if (logging)
+    {
+        fclose(logFile);
+        printf("events logged to logs/eventslog.txt\n");
+    }
+
+    running.store(false, std::memory_order_relaxed);
 }
