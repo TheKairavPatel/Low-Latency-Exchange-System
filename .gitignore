@@ -6,6 +6,7 @@ test
 eventslog.txt
 eventslog_pretty.txt
 bench
+linuxbench
 
 # object files
 *.o
