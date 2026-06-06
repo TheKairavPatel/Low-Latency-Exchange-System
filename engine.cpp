@@ -59,7 +59,7 @@ void Engine::processOrder(const ClientOrder& order)
                     Event rejectEvent = {order.price, order.quantity, order.orderID, 0, uint8_t((order.type == 0 || order.type == 3) ? 0 : 1), true};
                     outboundQueue.push(rejectEvent);
                 }
-                if (slotIndex != 0xFF) [[likely]]
+                else
                 {
                     globalOrderInfos[order.orderID] = {orderLevel, slotIndex, 0, true};
                     buyBitmap[orderLevel/64] |= (1ULL << (orderLevel % 64));
@@ -88,7 +88,7 @@ void Engine::processOrder(const ClientOrder& order)
                             Event rejectEvent = {result.remaining.price, result.remaining.quantity, result.remaining.orderID, 0, uint8_t((order.type == 0 || order.type == 3) ? 0 : 1), true};
                             outboundQueue.push(rejectEvent);
                         }
-                        if (slotIndex != 0xFF) [[likely]]
+                        else
                         {
                             globalOrderInfos[order.orderID] = {orderLevel, slotIndex, 0, true};
                             buyBitmap[orderLevel/64] |= (1ULL << (orderLevel % 64));
@@ -125,7 +125,7 @@ void Engine::processOrder(const ClientOrder& order)
                     Event rejectEvent = {order.price, order.quantity, order.orderID, 0, uint8_t((order.type == 0 || order.type == 3) ? 0 : 1), true};
                     outboundQueue.push(rejectEvent);
                 }
-                if (slotIndex != 0xFF) [[likely]]
+                else
                 {
                     globalOrderInfos[order.orderID] = {orderLevel, slotIndex, 1, true};
                     sellBitmap[orderLevel/64] |= (1ULL << (orderLevel % 64));
@@ -155,7 +155,7 @@ void Engine::processOrder(const ClientOrder& order)
                             Event rejectEvent = {result.remaining.price, result.remaining.quantity, result.remaining.orderID, 0, uint8_t((order.type == 0 || order.type == 3) ? 0 : 1), true};
                             outboundQueue.push(rejectEvent);
                         }
-                        if (slotIndex != 0xFF) [[likely]]
+                        else
                         {
                             globalOrderInfos[order.orderID] = {orderLevel, slotIndex, 1, true};
                             sellBitmap[orderLevel/64] |= (1ULL << (orderLevel % 64));
