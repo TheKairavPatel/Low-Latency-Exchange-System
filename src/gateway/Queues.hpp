@@ -1,7 +1,6 @@
 #pragma once
-#include "order.hpp"
 #include <atomic>
-#include <cstdint>
+#include "../engine/order.hpp"
 
 class OutboundQueue
 {

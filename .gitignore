@@ -1,12 +1,8 @@
 # compiled output
-engine.exe
-test.exe
-engine
-test
-eventslog.txt
-eventslog_pretty.txt
-bench
-linuxbench
+build/
+
+# logs
+logs/
 
 # object files
 *.o
@@ -17,5 +13,3 @@ linuxbench
 
 # build artifacts
 *.out
-
-*.exe

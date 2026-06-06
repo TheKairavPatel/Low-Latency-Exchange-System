@@ -1,6 +1,7 @@
 #pragma once
+#include <atomic>
 #include "priceLevel.hpp"
-#include "Queues.hpp"
+#include "../gateway/Queues.hpp"
 
 static constexpr uint32_t LEVELS = 2048;
 
@@ -23,8 +24,4 @@ class Engine
     uint16_t getBestAsk();
 
     void run();
-    private:
-    void markFilled(const FillResult& result);
-
-
 };

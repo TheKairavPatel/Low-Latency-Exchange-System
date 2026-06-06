@@ -3,12 +3,7 @@
 #include <random>
 #include <vector>
 #include <algorithm>
-#include <cstdio>
-#include <x86intrin.h>
-#include <algorithm>
-#include <thread>
 #include <chrono>
-#include <set>
 
 // The Gateway class simulates a client interface that generates random orders and sends them to the Engine, while also processing events coming back from the Engine.
 
@@ -104,7 +99,7 @@ void Gateway::run()
     static constexpr uint64_t NS_PER_ORDER = 1'000'000'000ULL / TARGET_RATE;
 
     // Open log file and write header
-    FILE* logFile = fopen("eventslog.txt", "w");
+    FILE* logFile = fopen("logs/eventslog.txt", "w");
     fprintf(logFile, "orderID,extID,price,quantity,type,side,fullyFilled\n");
 
     // Vectors to track live orders for cancellation
@@ -133,10 +128,10 @@ void Gateway::run()
     int ordersPlaced = 0;
 
     // Lambda to get current time in nanoseconds
-    auto nsNow = []() -> uint64_t {
-        struct timespec ts;
-        clock_gettime(CLOCK_MONOTONIC, &ts);
-        return ts.tv_sec * 1'000'000'000ULL + ts.tv_nsec;
+    auto nsNow = []() -> uint64_t 
+    {
+        using namespace std::chrono;
+        return duration_cast<nanoseconds>(steady_clock::now().time_since_epoch()).count();
     };
 
     // Initial timestamp for sending orders
@@ -219,6 +214,6 @@ void Gateway::run()
         }
     }
     fclose(logFile);
-    printf("events logged to eventslog.txt\n");
+    printf("events logged to build\\eventslog.txt\n");
     running.store(false, std::memory_order_relaxed); // signal engine thread to stop spinning
 }

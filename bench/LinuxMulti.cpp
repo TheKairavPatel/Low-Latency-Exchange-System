@@ -1,7 +1,9 @@
-#include "engine.hpp"
-#include "Gateway.hpp"
+#include "../src/engine/engine.hpp"
+#include "../src/gateway/Gateway.hpp"
 #include <thread>
-#include <stdio.h>
+#include <cstdio>
+#include <pthread.h>
+#include <sched.h>
 
 std::atomic<bool> running(true);
 Engine  engine(74000, running);
@@ -34,8 +36,8 @@ int main()
     gatewayThread.join();
     engineThread.join();
 
-    FILE* readBack = fopen("eventslog.txt", "r");
-    FILE* prettyFile = fopen("eventslog_pretty.txt", "w");
+    FILE* readBack  = fopen("logs/eventslog.txt", "r");
+    FILE* prettyFile = fopen("logs/eventslog_pretty.txt", "w");
 
     char lineBuf[256];
     (void)fgets(lineBuf, sizeof(lineBuf), readBack);
@@ -67,6 +69,6 @@ int main()
 
     fclose(readBack);
     fclose(prettyFile);
-    printf("pretty log written to eventslog_pretty.txt\n");
+    printf("pretty log written to logs/eventslog_pretty.txt\n");
     return 0;
 }

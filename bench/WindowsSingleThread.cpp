@@ -1,26 +1,16 @@
 #include <cstdio>
 #include <cstdint>
-#include <x86intrin.h>
 #include <vector>
 #include <algorithm>
 #include <random>
-#include <pthread.h>
-#include <sched.h>
-#include <unistd.h>
-#include "engine.hpp"
+#include <windows.h>
+#include "../src/engine/engine.hpp"
 
-void pin_to_core(int core) {
-    cpu_set_t set;
-    CPU_ZERO(&set);
-    CPU_SET(core, &set);
-    pthread_setaffinity_np(pthread_self(), sizeof(set), &set);
-
-    struct sched_param sp;
-    sp.sched_priority = 99;
-    if (sched_setscheduler(0, SCHED_FIFO, &sp) != 0) {
-        perror("sched_setscheduler (try running with sudo)");
-    }
-}
+#ifdef _WIN32
+    #include <intrin.h>
+#else
+    #include <x86intrin.h>
+#endif
 
 static inline uint64_t rdtsc_start() {
     unsigned int lo, hi;
@@ -48,10 +38,10 @@ inline void initIDs() {
 
 inline uint16_t allocID() { return freeIDs[topID++]; }
 inline void freeID(uint16_t id) { freeIDs[--topID] = id; }
-
 static std::atomic<bool> running(true);
 static Engine engine(BASE, running);
 volatile uint64_t sink = 0;
+
 
 // ── PREGEN ──
 enum OpType : uint8_t {
@@ -71,17 +61,27 @@ struct PregenOp {
     uint32_t qty;
 };
 
+void pin_to_core(int core) {
+    HANDLE thread = GetCurrentThread();
+    DWORD_PTR mask = 1ULL << core;
+    SetThreadAffinityMask(thread, mask);
+    SetThreadPriority(thread, THREAD_PRIORITY_TIME_CRITICAL);
+}
+
+
+
 int main()
 {
     pin_to_core(1);
-
     Event _drainEvent;
     auto drain = [&]() {
-        while (engine.outboundQueue.pop(_drainEvent))
-            sink ^= _drainEvent.orderID;
-    };
+    while (engine.outboundQueue.pop(_drainEvent))
+        sink ^= _drainEvent.orderID;
+};
 
-    printf("pinned to core 1\n");
+
+
+    printf("pinned to core 1 (P-core)\n");
 
     initIDs();
 
