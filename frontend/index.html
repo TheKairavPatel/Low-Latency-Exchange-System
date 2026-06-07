@@ -1,228 +1,169 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Order Book</title>
 <style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
+* { box-sizing: border-box; margin: 0; padding: 0; }
 
-  body {
-    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+body {
+    font-family: monospace;
+    font-size: 13px;
     background: #fff;
     color: #111;
-    padding: 40px;
-    font-size: 13px;
-  }
 
-  h1 {
-    font-size: 15px;
-    font-weight: 500;
-    margin-bottom: 4px;
-  }
+    margin: 0;
+    min-height: 100vh;
 
-  .sub {
-    font-size: 11px;
-    color: #999;
-    margin-bottom: 32px;
-  }
-
-  .status {
-    display: inline-block;
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: #22c55e;
-    margin-right: 5px;
-    animation: pulse 2s infinite;
-  }
-
-  @keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.3; }
-  }
-
-  .top {
     display: flex;
-    gap: 40px;
-    margin-bottom: 32px;
-  }
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
 
-  .metric-label { font-size: 11px; color: #999; margin-bottom: 4px; }
-  .metric-value { font-size: 22px; font-weight: 500; font-variant-numeric: tabular-nums; }
-  .metric-value.green { color: #16a34a; }
-  .metric-value.red { color: #dc2626; }
-  .metric-value.yellow { color: #ca8a04; }
-
-  .book {
-    width: 100%;
-    max-width: 480px;
-  }
-
-  table {
-    width: 100%;
+table {
+    width: 320px;
     border-collapse: collapse;
-  }
+    table-layout: fixed;
+}
 
-  th {
+col.c-price { width: 160px; }
+col.c-qty { width: 160px; }
+
+td, th {
+    padding: 3px 8px;
+    font-variant-numeric: tabular-nums;
+}
+
+th {
     font-size: 10px;
-    font-weight: 400;
     color: #bbb;
+    font-weight: normal;
     text-transform: uppercase;
     letter-spacing: 0.06em;
-    padding: 0 0 6px 0;
-    text-align: right;
-    border-bottom: 1px solid #f0f0f0;
-  }
+    padding-bottom: 6px;
+    border-bottom: 1px solid #eee;
+    text-align: left;
+}
 
-  th:first-child { text-align: left; }
+th:last-child { text-align: right; }
+td:last-child { text-align: right; }
 
-  td {
-    padding: 5px 0;
-    text-align: right;
-    font-variant-numeric: tabular-nums;
-    border-bottom: 1px solid #f7f7f7;
-    position: relative;
-  }
+.ask { color: #dc2626; }
+.bid { color: #16a34a; }
 
-  td:first-child { text-align: left; }
-
-  .bid-price { color: #16a34a; font-weight: 500; }
-  .ask-price { color: #dc2626; font-weight: 500; }
-  .muted { color: #bbb; }
-
-  .bar {
-    position: absolute;
-    top: 0; bottom: 0;
-    pointer-events: none;
-    opacity: 0.07;
-    transition: width 0.3s;
-  }
-  .bar-bid { background: #16a34a; left: 0; }
-  .bar-ask { background: #dc2626; left: 0; }
-
-  .spread-row {
-    padding: 8px 0;
+.spread-row {
+    padding: 6px 8px;
     font-size: 11px;
     color: #999;
-    border-top: 1px solid #f0f0f0;
-    border-bottom: 1px solid #f0f0f0;
-    display: flex;
-    gap: 8px;
-    align-items: center;
-  }
+    width: 320px;
+    border-top: 1px solid #eee;
+    border-bottom: 1px solid #eee;
+    margin: 2px 0;
+}
 
-  .spread-val { color: #ca8a04; font-weight: 500; }
-
-  .last {
+.ts {
     font-size: 11px;
     color: #ccc;
-    margin-top: 24px;
-  }
+    margin-top: 12px;
+    text-align: center;
+}
 </style>
 </head>
 <body>
 
-<h1><span class="status"></span>SPY &mdash; Live Order Book</h1>
-<div class="sub">Low Latency Exchange &nbsp;&middot;&nbsp; ~44ns p50 &nbsp;&middot;&nbsp; <span id="status-text">connecting</span></div>
-
-<div class="top">
-  <div class="metric">
-    <div class="metric-label">Best Bid</div>
-    <div class="metric-value green" id="best-bid">—</div>
-  </div>
-  <div class="metric">
-    <div class="metric-label">Spread</div>
-    <div class="metric-value yellow" id="spread">—</div>
-  </div>
-  <div class="metric">
-    <div class="metric-label">Best Ask</div>
-    <div class="metric-value red" id="best-ask">—</div>
-  </div>
-</div>
-
-<div class="book">
-  <table>
-    <thead><tr><th>Price</th><th>Qty</th><th>Cumulative</th></tr></thead>
+<table>
+    <colgroup>
+        <col class="c-price">
+        <col class="c-qty">
+    </colgroup>
+    <thead>
+        <tr>
+            <th>Price</th>
+            <th>Qty</th>
+        </tr>
+    </thead>
     <tbody id="ask-body"></tbody>
-  </table>
+</table>
 
-  <div class="spread-row">
-    <span>spread</span>
-    <span class="spread-val" id="spread-mid">—</span>
-  </div>
-
-  <table>
-    <tbody id="bid-body"></tbody>
-  </table>
+<div class="spread-row">
+    spread <span id="spread-val">—</span>
 </div>
 
-<div class="last" id="last"></div>
+<table>
+    <colgroup>
+        <col class="c-price">
+        <col class="c-qty">
+    </colgroup>
+    <tbody id="bid-body"></tbody>
+</table>
+
+<div class="ts" id="ts"></div>
 
 <script>
-const POLL_MS = 100;
+const POLL_MS = 500;
 
-function fmt(n) { return n.toLocaleString(); }
-function fmtP(p) { return '$' + (p / 100).toFixed(2); }
+function fmtP(p) {
+    return '$' + (p / 100).toFixed(2);
+}
+
+function fmt(n) {
+    return n.toLocaleString();
+}
 
 async function fetchSnapshot() {
-  try {
-    const res = await fetch('snapshot.json?t=' + Date.now());
-    if (!res.ok) throw new Error();
-    const data = await res.json();
-    render(data);
-    document.getElementById('status-text').textContent = 'live';
-    document.getElementById('last').textContent = 'updated ' + new Date().toLocaleTimeString();
-  } catch(e) {
-    document.getElementById('status-text').textContent = 'waiting for engine...';
-  }
+    try {
+        const res = await fetch('snapshot.json?t=' + Date.now());
+        if (!res.ok) throw new Error();
+
+        const data = await res.json();
+        render(data);
+
+        document.getElementById('ts').textContent =
+            'updated ' + new Date().toLocaleTimeString();
+    } catch (e) {
+        document.getElementById('ts').textContent =
+            'waiting for engine...';
+    }
 }
 
 function render(data) {
-  const bids = data.bids || [];
-  const asks = data.asks || [];
-  const bestBid = bids[0]?.price ?? 0;
-  const bestAsk = asks[0]?.price ?? 0;
-  const spread = bestAsk && bestBid ? bestAsk - bestBid : 0;
+    const bids = data.bids || [];
+    const asks = data.asks || [];
 
-  document.getElementById('best-bid').textContent = bestBid ? fmtP(bestBid) : '—';
-  document.getElementById('best-ask').textContent = bestAsk ? fmtP(bestAsk) : '—';
-  document.getElementById('spread').textContent = spread ? fmtP(spread) : '—';
-  document.getElementById('spread-mid').textContent = spread ? fmtP(spread) : '—';
+    const bestBid = bids[0]?.price ?? 0;
+    const bestAsk = asks[0]?.price ?? 0;
 
-  let bidCum = 0;
-  const bidTotals = bids.map(b => { bidCum += b.qty; return bidCum; });
-  let askCum = 0;
-  const askTotals = asks.map(a => { askCum += a.qty; return askCum; });
-  const maxCum = Math.max(bidCum, askCum, 1);
+    const spread = bestAsk && bestBid
+        ? bestAsk - bestBid
+        : 0;
 
-  // asks reversed so best ask is closest to spread
-  const asksRev = [...asks].reverse();
-  const askTotalsRev = [...askTotals].reverse();
+    document.getElementById('spread-val').textContent =
+        spread ? fmtP(spread) : '—';
 
-  document.getElementById('ask-body').innerHTML = asksRev.map((a, i) => `
-    <tr>
-      <td class="ask-price" style="position:relative;">
-        <div class="bar bar-ask" style="width:${(askTotalsRev[i]/maxCum*100).toFixed(1)}%"></div>
-        ${fmtP(a.price)}
-      </td>
-      <td>${fmt(a.qty)}</td>
-      <td class="muted">${fmt(askTotalsRev[i])}</td>
-    </tr>`).join('');
+    const asksRev = [...asks].reverse();
 
-  document.getElementById('bid-body').innerHTML = bids.map((b, i) => `
-    <tr>
-      <td class="bid-price" style="position:relative;">
-        <div class="bar bar-bid" style="width:${(bidTotals[i]/maxCum*100).toFixed(1)}%"></div>
-        ${fmtP(b.price)}
-      </td>
-      <td>${fmt(b.qty)}</td>
-      <td class="muted">${fmt(bidTotals[i])}</td>
-    </tr>`).join('');
+    document.getElementById('ask-body').innerHTML =
+        asksRev.map(a => `
+            <tr>
+                <td class="ask">${fmtP(a.price)}</td>
+                <td class="ask">${fmt(a.qty)}</td>
+            </tr>
+        `).join('');
+
+    document.getElementById('bid-body').innerHTML =
+        bids.map(b => `
+            <tr>
+                <td class="bid">${fmtP(b.price)}</td>
+                <td class="bid">${fmt(b.qty)}</td>
+            </tr>
+        `).join('');
 }
 
 fetchSnapshot();
 setInterval(fetchSnapshot, POLL_MS);
 </script>
+
 </body>
 </html>

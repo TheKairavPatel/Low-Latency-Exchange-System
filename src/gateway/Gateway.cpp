@@ -124,7 +124,7 @@ void Gateway::run()
     std::mt19937 rng(std::random_device{}());
     std::uniform_int_distribution<uint32_t> extIDDist(0, UINT32_MAX);
     std::uniform_int_distribution<int> cancelSideDist(0, 1);
-    std::uniform_int_distribution<int> cancelRoll(0, 3);
+    std::uniform_int_distribution<int> cancelRoll(0, 1);
 
     uint32_t ordersPlaced = 0;
 
