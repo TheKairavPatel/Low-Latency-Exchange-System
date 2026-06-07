@@ -277,3 +277,13 @@ void Engine::run()
     printf("  p99  : %lu cycles\n", pct(0.99));
     printf("  p99.9: %lu cycles\n", pct(0.999));
 }
+
+void Engine::runDemo()
+{
+    ClientOrder order;
+    while (running.load(std::memory_order_relaxed))
+    {
+        while (inboundQueue.pop(order))
+            processOrder(order);
+    }
+}

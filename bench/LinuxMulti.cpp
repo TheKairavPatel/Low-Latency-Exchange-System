@@ -44,13 +44,14 @@ int main()
 
     while (fgets(lineBuf, sizeof(lineBuf), readBack))
     {
-        uint32_t orderID, extIDVal, price, quantity, type, side, fullyFilled;
-        sscanf(lineBuf, "%u,%u,%u,%u,%u,%u,%u", &orderID, &extIDVal, &price, &quantity, &type, &side, &fullyFilled);
+        uint32_t orderID, extIDVal, quantity, type, side, fullyFilled;
+        float price;
+        sscanf(lineBuf, "%u,%u,%f,%u,%u,%u,%u", &orderID, &extIDVal, &price, &quantity, &type, &side, &fullyFilled);
 
         const char* eventType;
         if (type == 0)
             eventType = "   CANCEL   ";
-        else if (type == 1 && price == 0 && fullyFilled)
+        else if (type == 1 && price == 0.0f && fullyFilled)
             eventType = quantity == 0 ? " MKT FILLED " : "MKT PARTIAL ";
         else if (fullyFilled)
             eventType = "    FILL    ";
@@ -59,11 +60,11 @@ int main()
 
         const char* sideStr = (side == 0) ? "BUY " : "SELL";
 
-        if (type == 1 && price == 0)
+        if (type == 1 && price == 0.0f)
             fprintf(prettyFile, "[%s] | %s | EXT_ID: %-12u | ENG_ID: %-6u | REMAINING QTY: %u\n",
                     eventType, sideStr, extIDVal, orderID, quantity);
         else
-            fprintf(prettyFile, "[%s] | %s | EXT_ID: %-12u | ENG_ID: %-6u | $%u.00 | QTY: %u\n",
+            fprintf(prettyFile, "[%s] | %s | EXT_ID: %-12u | ENG_ID: %-6u | $%.2f | QTY: %u\n",
                     eventType, sideStr, extIDVal, orderID, price, quantity);
     }
 

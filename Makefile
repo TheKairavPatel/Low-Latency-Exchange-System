@@ -15,8 +15,8 @@ linux-single:
 windows-single:
 	$(CXX) $(FLAGS) -o build/WindowsSingle $(SRCS) bench/WindowsSingle.cpp -lpthread
 
-tests:
-	$(CXX) $(FLAGS) -o build/test $(SRCS) tests/test.cpp -lpthread
+live-demo:
+	$(CXX) $(FLAGS) -o build/LiveDemo src/engine/engine.cpp src/engine/priceLevel.cpp src/gateway/Gateway.cpp src/gateway/Queues.cpp src/snapshot/SnapshotWriter.cpp bench/LiveDemo.cpp -lpthread
 
 clean:
 	rm -rf build/*

@@ -38,11 +38,11 @@ void Gateway::releaseID(uint16_t id)
 ClientOrder Gateway::generateRandomOrder(uint16_t id)
 {
     static std::mt19937 rng(std::random_device{}());
-    static std::normal_distribution<double> bidOffDist(15.0, 5.0);
-    static std::normal_distribution<double> askOffDist(15.0, 5.0);
-    static std::uniform_int_distribution<uint32_t> aggOffDist(1, 5);
-    static std::lognormal_distribution<double> qtyDist(3.8, 1.0);
-    static std::lognormal_distribution<double> mktQtyDist(3.8, 1.0);
+    static std::normal_distribution<double> bidOffDist(3.0, 1.0);
+    static std::normal_distribution<double> askOffDist(3.0, 1.0);
+    static std::uniform_int_distribution<uint32_t> aggOffDist(1, 3);
+    static std::lognormal_distribution<double> qtyDist(3.0, 0.7);
+    static std::lognormal_distribution<double> mktQtyDist(2.5, 0.5);
     static std::discrete_distribution<int> opDist({40, 40, 10, 10, 1, 1});
     static std::uniform_int_distribution<int> trendStep(-1, 1);
 
@@ -53,13 +53,13 @@ ClientOrder Gateway::generateRandomOrder(uint16_t id)
     int step = trendStep(rng);
     trend = std::clamp(trend + step, -MAX_TREND, MAX_TREND);
 
-    int bidOff = std::clamp((int)bidOffDist(rng), 1, 500);
-    int askOff = std::clamp((int)askOffDist(rng), 1, 500);
+    int bidOff = std::clamp((int)bidOffDist(rng), 1, 20);
+    int askOff = std::clamp((int)askOffDist(rng), 1, 20);
 
     int op = opDist(rng);
     uint32_t price = 0;
     uint8_t type = 0;
-    uint16_t qty = (uint16_t)std::clamp((int)qtyDist(rng), 5, 2000);
+    uint16_t qty = (uint16_t)std::clamp((int)qtyDist(rng), 5, 500);
 
     switch (op)
     {
@@ -81,11 +81,11 @@ ClientOrder Gateway::generateRandomOrder(uint16_t id)
             break;
         case 4:
             type = 3;
-            qty = (uint16_t)std::clamp((int)mktQtyDist(rng), 5, 2000);
+            qty = (uint16_t)std::clamp((int)mktQtyDist(rng), 5, 200);
             break;
         case 5:
             type = 4;
-            qty = (uint16_t)std::clamp((int)mktQtyDist(rng), 5, 2000);
+            qty = (uint16_t)std::clamp((int)mktQtyDist(rng), 5, 200);
             break;
     }
     return {price, qty, id, type};
@@ -149,8 +149,8 @@ void Gateway::run()
         while (engine.outboundQueue.pop(e))
         {
             if (logging)
-                fprintf(logFile, "%u,%u,%u,%u,%u,%u,%d\n",
-                        e.orderID, extID[e.orderID], e.price, e.quantity, e.type, e.side, e.fullyFilled);
+                fprintf(logFile, "%u,%u,%.2f,%u,%u,%u,%d\n",
+                        e.orderID, extID[e.orderID], e.price / 100.0f, e.quantity, e.type, e.side, e.fullyFilled);
             if (e.fullyFilled)
             {
                 releaseID(e.orderID);
@@ -204,8 +204,8 @@ void Gateway::run()
     while (engine.outboundQueue.pop(e))
     {
         if (logging)
-            fprintf(logFile, "%u,%u,%u,%u,%u,%u,%d\n",
-                    e.orderID, extID[e.orderID], e.price, e.quantity, e.type, e.side, e.fullyFilled);
+            fprintf(logFile, "%u,%u,%.2f,%u,%u,%u,%d\n",
+                    e.orderID, extID[e.orderID], e.price / 100.0f, e.quantity, e.type, e.side, e.fullyFilled);
         if (e.fullyFilled)
         {
             releaseID(e.orderID);
