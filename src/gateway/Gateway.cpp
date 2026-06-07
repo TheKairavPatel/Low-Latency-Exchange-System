@@ -124,7 +124,7 @@ void Gateway::run()
     std::mt19937 rng(std::random_device{}());
     std::uniform_int_distribution<uint32_t> extIDDist(0, UINT32_MAX);
     std::uniform_int_distribution<int> cancelSideDist(0, 1);
-    std::uniform_int_distribution<int> cancelRoll(0, 9);
+    std::uniform_int_distribution<int> cancelRoll(0, 3);
 
     uint32_t ordersPlaced = 0;
 
@@ -145,6 +145,7 @@ void Gateway::run()
     // Main loop: process outbound events and send new orders at the target rate
     while (ordersPlaced < totalOrders)
     {
+        // Drain outbound events from engine
         Event e;
         while (engine.outboundQueue.pop(e))
         {
@@ -162,11 +163,12 @@ void Gateway::run()
         if (nsNow() < nextSend) continue;
         nextSend += NS_PER_ORDER;
 
+        // Attempt a cancel independently of order placement
         bool doCancel = false;
         bool cancelSide = cancelSideDist(rng);
-        if (cancelSide == 0 && liveBids.size() > 10)
+        if (cancelSide == 0 && liveBids.size() > 0)
             doCancel = true;
-        else if (cancelSide == 1 && liveAsks.size() > 10)
+        else if (cancelSide == 1 && liveAsks.size() > 0)
             doCancel = true;
         if (cancelRoll(rng) != 0) doCancel = false;
 
@@ -178,25 +180,23 @@ void Gateway::run()
             uint16_t cancelID = side[idx];
             side[idx] = side.back();
             side.pop_back();
-
             ClientOrder cancel = {0, 0, cancelID, 2};
             engine.inboundQueue.push(cancel);
         }
-        else
-        {
-            uint16_t id = getID();
-            if (id == 0xFFFF) continue;
 
-            if (logging) extID[id] = extIDDist(rng);
+        // Always place a new order every tick
+        uint16_t id = getID();
+        if (id == 0xFFFF) continue;
 
-            ClientOrder order = generateRandomOrder(id);
+        if (logging) extID[id] = extIDDist(rng);
 
-            if (order.type == 0) liveBids.push_back(id);
-            else if (order.type == 1) liveAsks.push_back(id);
+        ClientOrder order = generateRandomOrder(id);
 
-            engine.inboundQueue.push(order);
-            ordersPlaced++;
-        }
+        if (order.type == 0) liveBids.push_back(id);
+        else if (order.type == 1) liveAsks.push_back(id);
+
+        engine.inboundQueue.push(order);
+        ordersPlaced++;
     }
 
     // Drain remaining events

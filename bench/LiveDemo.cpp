@@ -27,6 +27,7 @@ void setFIFO(std::thread& t, int priority)
 
 int main()
 {
+
     std::thread engineThread(&Engine::runDemo, &engine);
     std::thread gatewayThread(&Gateway::run, &gw);
     std::thread snapshotThread(&SnapshotWriter::run, &snapshot);
