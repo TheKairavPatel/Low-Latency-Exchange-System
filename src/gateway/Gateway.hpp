@@ -19,5 +19,6 @@ class Gateway
     void run();
     uint16_t getID();
     void releaseID(uint16_t id);
-    ClientOrder generateRandomOrder(uint16_t id);
+    ClientOrder generateRandomOrder();
+    void registerOrder(uint16_t id, uint8_t type);
 };
