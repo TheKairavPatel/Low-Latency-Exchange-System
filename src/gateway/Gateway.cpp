@@ -46,7 +46,7 @@ ClientOrder Gateway::generateRandomOrder()
     static std::discrete_distribution<int>         opDist({40, 40, 10, 10, 1, 1});
     static std::uniform_int_distribution<int>      trendStep(-1, 1);
     static std::uniform_int_distribution<int>      cancelSideDist(0, 1);
-    static std::uniform_int_distribution<int>      cancelRoll(0, 3);
+    static std::uniform_int_distribution<int>      cancelRoll(0, 2);
 
     static constexpr uint32_t CENTER    = 74200;
     static constexpr int      MAX_TREND = 150;
@@ -149,6 +149,13 @@ void Gateway::run()
 
         engine.inboundQueue.push(order);
         ordersPlaced++;
+        if (ordersPlaced == 50000)
+        {
+            fclose(logFile);
+            printf("events logged to logs/eventslog.txt\n");
+            logging = false;
+            logFile = nullptr;
+        }
     }
 
     // Drain remaining events
