@@ -94,7 +94,7 @@ ClientOrder Gateway::generateRandomOrder(uint16_t id)
 void Gateway::run()
 {
     // Setup for order generation and flow
-    static constexpr int TARGET_RATE  = 100000;
+    static constexpr int TARGET_RATE  = 100'000'000;
     static constexpr uint64_t NS_PER_ORDER = 1'000'000'000ULL / TARGET_RATE;
 
     // Open log file if logging enabled

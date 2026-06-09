@@ -41,7 +41,7 @@ void SnapshotWriter::writeSnapshot(const char* filename)
         askCount++;
     }
 
-    fprintf(f, "\n  ]\n}\n");
+    fprintf(f, "\n  ],\n  \"totalOrders\": %llu\n}\n", (unsigned long long)engine.totalOrders);
     fclose(f);
 }
 

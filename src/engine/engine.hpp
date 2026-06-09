@@ -18,6 +18,7 @@ class Engine
     PriceLevel sellLevels[LEVELS];
     OutboundQueue outboundQueue;
     InboundQueue inboundQueue;
+    uint64_t totalOrders;
 
     Engine(uint32_t basePrice, std::atomic<bool>& running);
     void processOrder(const ClientOrder& order);

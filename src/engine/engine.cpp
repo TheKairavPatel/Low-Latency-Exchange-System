@@ -9,6 +9,7 @@ Engine::Engine(uint32_t basePrice, std::atomic<bool>& running) : basePrice(baseP
     memset(buyBitmap, 0, sizeof(buyBitmap));
     memset(sellBitmap, 0, sizeof(sellBitmap));
     memset(globalOrderInfos, 0, sizeof(globalOrderInfos));
+    totalOrders = 0;
 }
 
 uint16_t Engine::getBestAsk()
@@ -221,6 +222,7 @@ void Engine::processOrder(const ClientOrder& order)
             break;
         }
     }
+    totalOrders++;
 }
 
 void Engine::run()

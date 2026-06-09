@@ -1,16 +1,22 @@
 {
   "bids": [
-    {"price": 74085, "qty": 11},
-    {"price": 74084, "qty": 5},
-    {"price": 74082, "qty": 47},
-    {"price": 74081, "qty": 8},
-    {"price": 74080, "qty": 22},
-    {"price": 74079, "qty": 8},
-    {"price": 74078, "qty": 103},
-    {"price": 74077, "qty": 26}
+    {"price": 74291, "qty": 68},
+    {"price": 74289, "qty": 42},
+    {"price": 74288, "qty": 13},
+    {"price": 74287, "qty": 24},
+    {"price": 74286, "qty": 18},
+    {"price": 74285, "qty": 182},
+    {"price": 74284, "qty": 24},
+    {"price": 74283, "qty": 6},
+    {"price": 74282, "qty": 158}
   ],
   "asks": [
-    {"price": 74088, "qty": 7},
-    {"price": 74097, "qty": 13}
-  ]
+    {"price": 74304, "qty": 20},
+    {"price": 74306, "qty": 6},
+    {"price": 74310, "qty": 127},
+    {"price": 74311, "qty": 324},
+    {"price": 74312, "qty": 84},
+    {"price": 74313, "qty": 82}
+  ],
+  "totalOrders": 142056027
 }
