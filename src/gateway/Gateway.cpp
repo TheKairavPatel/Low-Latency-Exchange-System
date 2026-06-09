@@ -182,6 +182,7 @@ void Gateway::run()
             side.pop_back();
             ClientOrder cancel = {0, 0, cancelID, 2};
             engine.inboundQueue.push(cancel);
+            ordersPlaced++;
         }
 
         // Always place a new order every tick
