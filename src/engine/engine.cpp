@@ -227,7 +227,7 @@ void Engine::processOrder(const ClientOrder& order)
 
 void Engine::run()
 {
-    static uint64_t samples[500000];
+    static uint64_t samples[100000000];
     int sampleCount = 0;
 
     ClientOrder order;
@@ -238,7 +238,7 @@ void Engine::run()
             uint64_t s = __rdtsc();
             processOrder(order);
             uint64_t e = __rdtsc();
-            if (sampleCount < 500000)
+            if (sampleCount < 100000000)
                 samples[sampleCount++] = e - s;
         }
     }
