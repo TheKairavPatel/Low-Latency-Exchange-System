@@ -1,8 +1,7 @@
-# compiled output
-build/
-
-# logs
-logs/
+build/*
+!build/placeholder
+logs/*
+!logs/placeholder
 
 # object files
 *.o
