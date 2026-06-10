@@ -5,6 +5,9 @@
 #include <pthread.h>
 #include <sched.h>
 
+// This benchmark runs the engine and gateway at full speed with no logging, simulating a high-load scenario to test raw throughput and latency under stress
+// ENSURE GATEWAY ORDERS PER SECOND IS SET TO 100M IN Gateway::run() FOR THIS BENCHMARK
+
 std::atomic<bool> running(true);
 Engine  engine(74000, running);
 Gateway gw(engine, running, true, 150'000'000);
