@@ -5,12 +5,12 @@
 #include <pthread.h>
 #include <sched.h>
 
-// This benchmark runs the engine and gateway at full speed with no logging, simulating a high-load scenario to test raw throughput and latency under stress
-// ENSURE GATEWAY ORDERS PER SECOND IS SET TO 100M IN Gateway::run() FOR THIS BENCHMARK
+// This benchmark runs the engine and gateway at full speed (logging stops after 200k), simulating a high-load scenario to test raw throughput and latency under stress
+// Total orders set to 150 million, orders per second set to 100 million (past gateway capacity) to stress test
 
 std::atomic<bool> running(true);
 Engine  engine(74000, running);
-Gateway gw(engine, running, true, 150'000'000);
+Gateway gw(engine, running, true, 150'000'000, 100'000'000);
 
 void pinThread(std::thread& t, int core)
 {

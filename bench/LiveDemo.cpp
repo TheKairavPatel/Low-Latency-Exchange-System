@@ -6,12 +6,12 @@
 #include <pthread.h>
 #include <sched.h>
 
-// This demo runs the engine and gateway with logging enabled, simulating a realistic scenario of 60k orders to demonstrate the system's functionality and correctness
-// ENSURE GATEWAY ORDERS PER SECOND IS 1000 IN Gateway::run() FOR REALISM
+// This demo runs the engine and gateway with logging enabled, simulating a realistic scenario of 200k orders to demonstrate the system's functionality and correctness
+// Total orders set to 200k, orders per second set to 1k for realistic demo and log production
 
 std::atomic<bool> running(true);
 Engine engine(74000, running);
-Gateway gw(engine, running, true, 50'000);
+Gateway gw(engine, running, true, 200'000, 1000);
 SnapshotWriter snapshot(engine, running);
 
 void pinThread(std::thread& t, int core)

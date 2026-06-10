@@ -12,11 +12,12 @@ class Gateway
     bool logging;
     uint32_t totalOrders;
     bool owned[65536];
+    uint32_t targetRate;
 
     bool isEmpty() { return topID == 65535; }
 
     public:
-    Gateway(Engine& engine, std::atomic<bool> &running, bool logging = true, uint32_t totalOrders = 500'000);
+    Gateway(Engine& engine, std::atomic<bool> &running, bool logging = true, uint32_t totalOrders = 500'000, uint32_t targetRate = 1000);
     void run();
     uint16_t getID();
     void releaseID(uint16_t id);

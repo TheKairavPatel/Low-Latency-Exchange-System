@@ -7,7 +7,7 @@
 static std::vector<uint16_t> liveBids;
 static std::vector<uint16_t> liveAsks;
 
-Gateway::Gateway(Engine& engine, std::atomic<bool> &running, bool logging, uint32_t qtysim) : engine(engine), running(running), logging(logging), totalOrders(qtysim)
+Gateway::Gateway(Engine& engine, std::atomic<bool> &running, bool logging, uint32_t qtysim, uint32_t target) : engine(engine), running(running), logging(logging), totalOrders(qtysim), targetRate(target)
 {
     topID = 0;
     for (uint16_t i = 0; i < 65535; i++)
@@ -90,8 +90,7 @@ ClientOrder Gateway::generateRandomOrder()
 
 void Gateway::run()
 {
-    static constexpr int      TARGET_RATE  = 1000;
-    static constexpr uint64_t NS_PER_ORDER = 1'000'000'000ULL / TARGET_RATE;
+    uint64_t NS_PER_ORDER = 1'000'000'000ULL / targetRate;
 
     FILE* logFile = nullptr;
     if (logging)
@@ -169,7 +168,7 @@ void Gateway::run()
 
         engine.inboundQueue.push(order);
         ordersPlaced++;
-        if (ordersPlaced == 50000)
+        if (ordersPlaced == 200000)
         {
             fclose(logFile);
             printf("events logged to logs/eventslog.txt\n");
@@ -191,6 +190,5 @@ void Gateway::run()
         fclose(logFile);
         printf("events logged to logs/eventslog.txt\n");
     }
-
     running.store(false, std::memory_order_relaxed);
 }
