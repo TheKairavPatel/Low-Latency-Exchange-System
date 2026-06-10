@@ -90,14 +90,14 @@ ClientOrder Gateway::generateRandomOrder()
 
 void Gateway::run()
 {
-    static constexpr int      TARGET_RATE  = 100'000'000;
+    static constexpr int      TARGET_RATE  = 10'000'000;
     static constexpr uint64_t NS_PER_ORDER = 1'000'000'000ULL / TARGET_RATE;
 
     FILE* logFile = nullptr;
     if (logging)
     {
-        logFile = fopen("logs/eventslog.txt", "w");
-        fprintf(logFile, "orderID,extID,price,quantity,type,side,fullyFilled\n");
+        logFile = fopen("logs/eventslog_pretty.txt", "w");
+        setvbuf(logFile, nullptr, _IOFBF, 1024 * 1024); // 1MB buffer
     }
 
     std::mt19937 rng(std::random_device{}());
@@ -119,8 +119,26 @@ void Gateway::run()
         while (engine.outboundQueue.pop(e))
         {
             if (logging)
-                fprintf(logFile, "%u,%u,%.2f,%u,%u,%u,%d\n",
-                        e.orderID, extID[e.orderID], e.price / 100.0f, e.quantity, e.type, e.side, e.fullyFilled);
+                {
+                    const char* eventType;
+                    if (e.type == 0)
+                        eventType = "   CANCEL   ";
+                    else if (e.type == 1 && e.price == 0 && e.fullyFilled)
+                        eventType = e.quantity == 0 ? " MKT FILLED " : "MKT PARTIAL ";
+                    else if (e.fullyFilled)
+                        eventType = "    FILL    ";
+                    else
+                        eventType = "PARTIAL FILL";
+
+                    const char* sideStr = (e.side == 0) ? "BUY " : "SELL";
+
+                    if (e.type == 1 && e.price == 0)
+                        fprintf(logFile, "[%s] | %s | EXT_ID: %-12u | ENG_ID: %-6u | REMAINING QTY: %u\n",
+                                eventType, sideStr, extID[e.orderID], e.orderID, e.quantity);
+                    else
+                        fprintf(logFile, "[%s] | %s | EXT_ID: %-12u | ENG_ID: %-6u | $%.2f | QTY: %u\n",
+                                eventType, sideStr, extID[e.orderID], e.orderID, e.price / 100.0f, e.quantity);
+                }
             if (e.fullyFilled)
                 releaseID(e.orderID);
         }
@@ -162,9 +180,6 @@ void Gateway::run()
     Event e;
     while (engine.outboundQueue.pop(e))
     {
-        if (logging)
-            fprintf(logFile, "%u,%u,%.2f,%u,%u,%u,%d\n",
-                    e.orderID, extID[e.orderID], e.price / 100.0f, e.quantity, e.type, e.side, e.fullyFilled);
         if (e.fullyFilled)
             releaseID(e.orderID);
     }

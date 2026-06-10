@@ -11,6 +11,7 @@ class Gateway
     uint32_t extID[65536]; // maps internal ID to external ID for logging
     bool logging;
     uint32_t totalOrders;
+    bool owned[65536];
 
     bool isEmpty() { return topID == 65535; }
 
