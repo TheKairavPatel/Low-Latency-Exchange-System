@@ -90,7 +90,7 @@ ClientOrder Gateway::generateRandomOrder()
 
 void Gateway::run()
 {
-    static constexpr int      TARGET_RATE  = 100000000;
+    static constexpr int      TARGET_RATE  = 1000;
     static constexpr uint64_t NS_PER_ORDER = 1'000'000'000ULL / TARGET_RATE;
 
     FILE* logFile = nullptr;
@@ -121,7 +121,9 @@ void Gateway::run()
             if (logging)
                 {
                     const char* eventType;
-                    if (e.type == 0)
+                    if (e.type == 2)
+                        eventType = "    ACK     ";
+                    else if (e.type == 0)
                         eventType = "   CANCEL   ";
                     else if (e.type == 1 && e.price == 0 && e.fullyFilled)
                         eventType = e.quantity == 0 ? " MKT FILLED " : "MKT PARTIAL ";

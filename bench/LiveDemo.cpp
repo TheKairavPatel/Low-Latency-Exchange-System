@@ -11,7 +11,7 @@
 
 std::atomic<bool> running(true);
 Engine engine(74000, running);
-Gateway gw(engine, running, true, 60'000);
+Gateway gw(engine, running, true, 50'000);
 SnapshotWriter snapshot(engine, running);
 
 void pinThread(std::thread& t, int core)

@@ -34,6 +34,11 @@ uint16_t Engine::getBestBid()
 
 void Engine::processOrder(const ClientOrder& order)
 {
+    if (order.type != 2) // if not a cancel, send ACK immediately
+    {
+        uint8_t side = (order.type == 1 || order.type == 4) ? 1 : 0;
+        outboundQueue.push({order.price, order.quantity, order.orderID, 2, side, false, {}});
+    }
     switch (order.type)
     {
         case 0:
