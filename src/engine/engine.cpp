@@ -6,30 +6,30 @@
 
 Engine::Engine(uint32_t basePrice, std::atomic<bool>& running) : basePrice(basePrice), running(running)
 {
-    memset(buyBitmap, 0, sizeof(buyBitmap));
-    memset(sellBitmap, 0, sizeof(sellBitmap));
-    memset(globalOrderInfos, 0, sizeof(globalOrderInfos));
-    totalOrders = 0;
+    memset(buyBitmap, 0, sizeof(buyBitmap)); // set all bits to 0 of buy bitmap
+    memset(sellBitmap, 0, sizeof(sellBitmap)); // set all bits to 0 of sell bitmap
+    memset(globalOrderInfos, 0, sizeof(globalOrderInfos)); // set all original bits of lookup table to 0
+    totalOrders = 0; // original number of orders processed is 0
 }
 
-uint16_t Engine::getBestAsk()
+uint16_t Engine::getBestAsk() // returns indice of lowest price level with a ask order present
 {
-    for (int i = 0; i < 32; i++)
+    for (int i = 0; i < 32; i++) // loop through all uint64s until a bit with a 1 is found
     {
         if (sellBitmap[i] != 0)
-            return i*64 + __builtin_ctzll(sellBitmap[i]);
+            return i*64 + __builtin_ctzll(sellBitmap[i]); // use native assembly instruction to find number of trailing zeros before first 1 bit adding number of bits we have already gone through
     }
-    return LEVELS;
+    return LEVELS; // if no 1 bits found in bitmap, return LEVELS indicating no orders present in ask book
 }
 
-uint16_t Engine::getBestBid()
+uint16_t Engine::getBestBid() // returns indice of highest price level with a bid order present
 {
-    for (int i = 31; i >= 0; i--)
+    for (int i = 31; i >= 0; i--) // loop through all uint64s until a bit with a 1 is found
     {
-        if (buyBitmap[i] != 0)
-            return i*64 + (63 - __builtin_clzll(buyBitmap[i]));
+        if (buyBitmap[i] != 0) // if not all 0s in the current section of the bitmap (uint64)
+            return i*64 + (63 - __builtin_clzll(buyBitmap[i])); // use native assembly instruction to find number of leading zeros in current uint64 and add it to number of bits we already iterated through
     }
-    return LEVELS;
+    return LEVELS; // if no 1 bits found in bitmap, return LEVELS indicating no orders present in bid book
 }
 
 void Engine::processOrder(const ClientOrder& order)
