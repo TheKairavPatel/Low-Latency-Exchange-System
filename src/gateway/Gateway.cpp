@@ -168,7 +168,7 @@ void Gateway::run()
 
         engine.inboundQueue.push(order);
         ordersPlaced++;
-        if (ordersPlaced == 200000)
+        if (ordersPlaced == 200000 && logging)
         {
             fclose(logFile);
             printf("events logged to logs/eventslog.txt\n");

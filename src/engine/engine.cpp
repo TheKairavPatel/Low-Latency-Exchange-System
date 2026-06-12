@@ -266,23 +266,6 @@ void Engine::run()
     printf("  p99  : %lu cycles\n", pct(0.99));
     printf("  p99.9: %lu cycles\n", pct(0.999));
     printf("  max  : %lu cycles\n", samples[sampleCount - 1]);
-
-    uint64_t cutoff = pct(0.999);
-    int filtered = 0;
-    uint64_t filteredSum = 0;
-    for (int i = 0; i < sampleCount; i++) {
-        if (samples[i] <= cutoff) {
-            filteredSum += samples[i];
-            filtered++;
-        }
-    }
-
-    printf("\n=== FILTERED (p99.9 cutoff=%lu cycles) ===\n", cutoff);
-    printf("  mean : %.2f cycles\n", (double)filteredSum / filtered);
-    printf("  p50  : %lu cycles\n", pct(0.50));
-    printf("  p90  : %lu cycles\n", pct(0.90));
-    printf("  p99  : %lu cycles\n", pct(0.99));
-    printf("  p99.9: %lu cycles\n", pct(0.999));
 }
 
 void Engine::runDemo()

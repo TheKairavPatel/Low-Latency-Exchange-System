@@ -10,7 +10,7 @@
 
 std::atomic<bool> running(true);
 Engine  engine(74000, running);
-Gateway gw(engine, running, true, 150'000'000, 100'000'000);
+Gateway gw(engine, running, false, 150'000'000, 100'000'000);
 
 void pinThread(std::thread& t, int core)
 {
@@ -28,6 +28,7 @@ void setFIFO(std::thread& t, int priority)
 
 int main()
 {
+    auto start = std::chrono::high_resolution_clock::now();
     std::thread engineThread(&Engine::run, &engine);
     std::thread gatewayThread(&Gateway::run, &gw);
 
@@ -37,6 +38,10 @@ int main()
     setFIFO(gatewayThread, 98);
 
     gatewayThread.join();
+    auto end = std::chrono::high_resolution_clock::now();
     engineThread.join();
+    double seconds = std::chrono::duration<double>(end - start).count();
+    double throughput = 150'000'000.0 / seconds;
+    printf("\nGateway throughput: %.2f million orders/sec\n", throughput / 1e6);
     return 0;
 }
