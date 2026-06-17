@@ -4,11 +4,13 @@
 
 class SnapshotWriter
 {
-    Engine& engine;
-    std::atomic<bool>& running;
+    Engine& engine; // reference to live engine state (read-only snapshot source)
+    std::atomic<bool>& running; // global stop flag shared with engine/gateway
 
     public:
-    SnapshotWriter(Engine& engine, std::atomic<bool>& running) : engine(engine), running(running) {}
-    void writeSnapshot(const char* filename);
-    void run();
+    SnapshotWriter(Engine& engine, std::atomic<bool>& running)
+    : engine(engine), running(running) {} // bind engine + running flag
+
+    void writeSnapshot(const char* filename); // dump full orderbook state to json
+    void run(); // main loop that keeps snapshotting engine state
 };
