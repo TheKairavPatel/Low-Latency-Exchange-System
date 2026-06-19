@@ -17,16 +17,16 @@ SnapshotWriter snapshot(engine, running); // background snapshot dumper (order b
 
 void pinThread(std::thread& t, int core)
 {
-    cpu_set_t cpuset;
-    CPU_ZERO(&cpuset);
-    CPU_SET(core, &cpuset);
-    pthread_setaffinity_np(t.native_handle(), sizeof(cpu_set_t), &cpuset); // lock thread to core (less jitter)
+    cpu_set_t cpuset; // init "set" of cores available for given thread to use, currently garbage
+    CPU_ZERO(&cpuset); // memset all bits to 0 
+    CPU_SET(core, &cpuset); // flips given bit corresponding to given core number to 1
+    pthread_setaffinity_np(t.native_handle(), sizeof(cpu_set_t), &cpuset); // send to OS - make thread t only avaible to run on given core(s) based off cpuset
 }
 
 void setFIFO(std::thread& t, int priority)
 {
-    sched_param sp{priority};
-    pthread_setschedparam(t.native_handle(), SCHED_FIFO, &sp); // realtime scheduling (engine priority highest)
+    sched_param sp{priority}; // create OS scheduling struct holding priority and of type sched_param
+    pthread_setschedparam(t.native_handle(), SCHED_FIFO, &sp); // send to OS - set given thread priority to highest, ensuring no other thread takes over 
 }
 
 int main()
@@ -42,7 +42,7 @@ int main()
     pinThread(gatewayThread, 2);
     pinThread(snapshotThread, 3);
 
-    // prioritize engine > gateway (snapshot stays default priority)
+    // prioritize high
     setFIFO(engineThread, 99);
     setFIFO(gatewayThread, 98);
     // snapshot thread runs normal priority (non-critical path)

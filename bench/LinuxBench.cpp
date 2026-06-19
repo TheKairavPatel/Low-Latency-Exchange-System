@@ -14,19 +14,19 @@ Gateway gw(engine, running, false, 150'000'000, 100'000'000);
 // gateway: 150M total orders, target 100M orders/sec (intentionally above realistic capacity to stress system)
 
 // pins a thread to a specific CPU core (reduces scheduler noise, improves latency consistency)
-void pinThread(std::thread& t, int core)
+void pinThread(std::thread& t, int core) // reference to thread object, cannot copy thread object as a argument, core is dedicated cpu core we want to pin to
 {
-    cpu_set_t cpuset;
-    CPU_ZERO(&cpuset);
-    CPU_SET(core, &cpuset);
-    pthread_setaffinity_np(t.native_handle(), sizeof(cpu_set_t), &cpuset);
+    cpu_set_t cpuset; // init "set" of cores available for given thread to use, currently garbage
+    CPU_ZERO(&cpuset); // memset all bits to 0 
+    CPU_SET(core, &cpuset); // flips given bit corresponding to given core number to 1
+    pthread_setaffinity_np(t.native_handle(), sizeof(cpu_set_t), &cpuset); // send to OS - make thread t only avaible to run on given core(s) based off cpuset
 }
 
 // forces realtime scheduling (FIFO) with priority (engine usually higher priority than gateway)
 void setFIFO(std::thread& t, int priority)
 {
-    sched_param sp{priority};
-    pthread_setschedparam(t.native_handle(), SCHED_FIFO, &sp);
+    sched_param sp{priority}; // create OS scheduling struct holding priority and of type sched_param
+    pthread_setschedparam(t.native_handle(), SCHED_FIFO, &sp); // send to OS - set given thread priority to highest, ensuring no other thread takes over 
 }
 
 int main()
@@ -41,7 +41,7 @@ int main()
     pinThread(gatewayThread, 2); // bind gateway to core 2
 
     setFIFO(engineThread, 99);   // highest priority goes to engine (critical path)
-    setFIFO(gatewayThread, 98);  // slightly lower priority for gateway
+    setFIFO(gatewayThread, 98);  // 
 
     gatewayThread.join(); // wait for gateway to finish generating all orders
     auto end = std::chrono::high_resolution_clock::now(); // stop timing after workload generation ends
