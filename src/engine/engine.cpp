@@ -240,9 +240,9 @@ void Engine::run()
     {
         while (inboundQueue.pop(order)) // drain whatever orders are waiting
         {
-            uint64_t s = __rdtsc(); // timestamp before processing
+            uint64_t s = __rdtsc(); // cpu cycle counter before processing
             processOrder(order);
-            uint64_t e = __rdtsc(); // timestamp after processing
+            uint64_t e = __rdtsc(); // cpu cycle counter after processing
             if (sampleCount < 100000000)
                 samples[sampleCount++] = e - s; // record latency in cycles for this order
         }
@@ -252,7 +252,8 @@ void Engine::run()
 
     std::sort(samples, samples + sampleCount); // sort so we can pull percentiles by index
 
-    auto pct = [&](double p) -> uint64_t {
+    auto pct = [&](double p) -> uint64_t 
+    {
         return samples[(size_t)(p * (sampleCount - 1))]; // index into sorted samples for the given percentile
     };
 
