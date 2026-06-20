@@ -36,10 +36,6 @@ void Engine::processOrder(const ClientOrder& order)
 {
     if (order.type != 2) // if not a cancel, send ACK immediately
     {
-        if (globalOrderInfos[order.orderID].live) 
-        {
-            return;
-        }
         uint8_t side = (order.type == 1 || order.type == 4) ? 1 : 0; // side = 1 for sell/market sell acks, 0 for buy/market buy acks
         outboundQueue.push({order.price, order.quantity, order.orderID, 2, side, false, {}}); // push ack of original incoming order info
     }
