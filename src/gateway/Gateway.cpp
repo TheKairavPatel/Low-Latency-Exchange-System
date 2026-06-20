@@ -61,7 +61,7 @@ ClientOrder Gateway::generateRandomOrder()
     static constexpr int MAX_TREND = 150; // bounds for drift
     static int trend = 0; // persistent market drift state
 
-    // try cancel first (cheap way to simulate order churn)
+    // try cancel first 
     bool cancelSide = cancelSideDist(rng); // pick side
     std::vector<uint16_t>& cancelPool = cancelSide ? liveAsks : liveBids; // choose pool
 
@@ -81,8 +81,8 @@ ClientOrder Gateway::generateRandomOrder()
     // generate new order (no engine ID yet)
     trend = std::clamp(trend + trendStep(rng), -MAX_TREND, MAX_TREND); // drift update
 
-    int bidOff = std::clamp((int)bidOffDist(rng), 1, 20); // bid offset noise
-    int askOff = std::clamp((int)askOffDist(rng), 1, 20); // ask offset noise
+    int bidOff = std::clamp((int)bidOffDist(rng), 1, 20); // clamp bid offset noise from 1 - 20
+    int askOff = std::clamp((int)askOffDist(rng), 1, 20); // clamp ask offset noise from 1 - 20 
 
     int op = opDist(rng); // pick order type
 
@@ -159,7 +159,17 @@ void Gateway::run()
             }
 
             if (e.fullyFilled)
+            {
                 releaseID(e.orderID); // recycle engine ID
+                
+                std::vector<uint16_t>& pool = (e.side == 0) ? liveBids : liveAsks;
+                auto it = std::find(pool.begin(), pool.end(), e.orderID);
+                if (it != pool.end())
+                {
+                    *it = pool.back();
+                    pool.pop_back();
+                }
+            }
         }
 
         if (nsNow() < nextSend) continue; // throttle order rate
@@ -179,8 +189,7 @@ void Gateway::run()
 
         order.orderID = id; // attach engine ID
 
-        if (logging)
-            extID[id] = extIDDist(rng); // map to fake external ID
+        extID[id] = extIDDist(rng); // map to fake external ID
 
         registerOrder(id, order.type); // track live order
 
