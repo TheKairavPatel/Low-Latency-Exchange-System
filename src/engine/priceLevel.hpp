@@ -15,7 +15,7 @@ class alignas(64) PriceLevel
     uint32_t totalQuantity; // total quantity at this price level, updated on insert, fill, and cancel
     //------------FUNCTIONS-------------
     PriceLevel();
-    uint8_t insertOrder(const ClientOrder& order); // inserts an order into the price level, returns the index of the order in the orders array, or 255 if the price level is full
+    uint8_t insertOrder(const ClientOrder& order, GlobalOrderInfo* infos); // inserts an order into the price level, returns the index of the order in the orders array, or 255 if the price level is full
     FillResult fillOrder(const ClientOrder& order, uint32_t levelPrice, uint8_t side, GlobalOrderInfo* infos); // fills an incoming order against the orders in this price level, returns the remaining order and any events generated from the filling process
     void cancelOrder(uint8_t slotIndex); // cancels an order at the given index in the orders array
     uint8_t getHead() const { return head; } // index of the next order to be filled chronologically

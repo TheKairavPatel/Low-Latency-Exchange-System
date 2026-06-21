@@ -12,7 +12,7 @@ PriceLevel::PriceLevel()
     totalQuantity = 0; // starting with 0 quantity at this price level
 }
 
-uint8_t PriceLevel::insertOrder(const ClientOrder& order)
+uint8_t PriceLevel::insertOrder(const ClientOrder& order, GlobalOrderInfo* infos)
 {
     if (stackTop == 255) [[unlikely]]
     {
@@ -20,6 +20,7 @@ uint8_t PriceLevel::insertOrder(const ClientOrder& order)
     }
     uint8_t newIndex = freeIndexes[stackTop]; // get the next free index from the stack
     stackTop++; // increment stacktop to next free index
+    infos[order.orderID].live = true;
 
     // insert the new order into the orders array at newIndex
     orders[newIndex].quantity = order.quantity;

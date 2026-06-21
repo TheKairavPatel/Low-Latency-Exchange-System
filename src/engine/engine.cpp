@@ -3,6 +3,8 @@
 #include <cstdio>
 #include <x86intrin.h>
 #include <algorithm>
+#include <iostream>
+using namespace std;
 
 Engine::Engine(uint32_t basePrice, std::atomic<bool>& running) : basePrice(basePrice), running(running)
 {
@@ -48,7 +50,7 @@ void Engine::processOrder(const ClientOrder& order)
 
             if (bestAsk == LEVELS || orderLevel < bestAsk) // if no sell orders are none below asking price
             {
-                uint8_t slotIndex = buyLevels[orderLevel].insertOrder(order); // store into correct pricelevel in buy book
+                uint8_t slotIndex = buyLevels[orderLevel].insertOrder(order, globalOrderInfos); // store into correct pricelevel in buy book
                 if (slotIndex == 0xFF) [[unlikely]] // 0xFF signals the price level's order array is full
                 {
                     Event rejectEvent = {order.price, order.quantity, order.orderID, 0, 0, true}; // build reject event for this buy order
@@ -73,7 +75,7 @@ void Engine::processOrder(const ClientOrder& order)
                     bestAsk = getBestAsk(); // refresh best ask, sell side may have changed
                     if (bestAsk == LEVELS || bestAsk > orderLevel) // no more asks within our limit price, rest the remainder in the buy book
                     {
-                        uint8_t slotIndex = buyLevels[orderLevel].insertOrder(result.remaining); // insert leftover quantity at our original order level
+                        uint8_t slotIndex = buyLevels[orderLevel].insertOrder(result.remaining, globalOrderInfos); // insert leftover quantity at our original order level
                         if (slotIndex == 0xFF) [[unlikely]] // reject leftover quantity if price level is full
                         {
                             Event rejectEvent = {result.remaining.price, result.remaining.quantity, result.remaining.orderID, 0, 0, true}; // build reject event for the unfilled remainder
@@ -105,7 +107,7 @@ void Engine::processOrder(const ClientOrder& order)
 
             if (bestBid == LEVELS || orderLevel > bestBid) // if no buy orders are at or above asking price
             {
-                uint8_t slotIndex = sellLevels[orderLevel].insertOrder(order); // store into correct pricelevel in sell book
+                uint8_t slotIndex = sellLevels[orderLevel].insertOrder(order, globalOrderInfos); // store into correct pricelevel in sell book
                 if (slotIndex == 0xFF) [[unlikely]] // 0xFF signals the price level's order array is full
                 {
                     Event rejectEvent = {order.price, order.quantity, order.orderID, 0, 1, true}; // build reject event for this sell order
@@ -130,7 +132,7 @@ void Engine::processOrder(const ClientOrder& order)
                     bestBid = getBestBid(); // refresh best bid, buy side may have changed
                     if (bestBid == LEVELS || bestBid < orderLevel) // no more bids within our limit price, rest the remainder in the sell book
                     {
-                        uint8_t slotIndex = sellLevels[orderLevel].insertOrder(result.remaining); // insert leftover quantity at our original order level
+                        uint8_t slotIndex = sellLevels[orderLevel].insertOrder(result.remaining, globalOrderInfos); // insert leftover quantity at our original order level
                         if (slotIndex == 0xFF) [[unlikely]] // reject leftover quantity if price level is full
                         {
                             Event rejectEvent = {result.remaining.price, result.remaining.quantity, result.remaining.orderID, 0, 1, true}; // build reject event for the unfilled remainder
@@ -201,8 +203,11 @@ void Engine::processOrder(const ClientOrder& order)
                     bestAsk = getBestAsk(); // move on to next best ask
                 }
             }
-            Event marketDoneEvent = {order.price, result.remaining.quantity, order.orderID, 1, 0, true}; // report leftover unfilled quantity, if any
-            outboundQueue.push(marketDoneEvent); // notify client the market order is done
+            if (result.remaining.quantity > 0) // only report if order couldn't be fully filled
+            {
+                Event marketDoneEvent = {order.price, result.remaining.quantity, order.orderID, 1, 0, true};
+                outboundQueue.push(marketDoneEvent);
+            }
             break;
         }
         case 4: // MARKET SELL
@@ -222,8 +227,11 @@ void Engine::processOrder(const ClientOrder& order)
                     bestBid = getBestBid(); // move on to next best bid
                 }
             }
-            Event marketDoneEvent = {order.price, result.remaining.quantity, order.orderID, 1, 1, true}; // report leftover unfilled quantity, if any
-            outboundQueue.push(marketDoneEvent); // notify client the market order is done
+            if (result.remaining.quantity > 0) // only report if order couldn't be fully filled
+            {
+                Event marketDoneEvent = {order.price, result.remaining.quantity, order.orderID, 1, 1, true};
+                outboundQueue.push(marketDoneEvent);
+            }
             break;
         }
     }
