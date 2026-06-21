@@ -3,8 +3,6 @@
 #include <cstdio>
 #include <x86intrin.h>
 #include <algorithm>
-#include <iostream>
-using namespace std;
 
 Engine::Engine(uint32_t basePrice, std::atomic<bool>& running) : basePrice(basePrice), running(running)
 {
