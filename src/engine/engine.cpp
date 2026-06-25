@@ -10,6 +10,7 @@ Engine::Engine(uint32_t basePrice, std::atomic<bool>& running) : basePrice(baseP
     memset(sellBitmap, 0, sizeof(sellBitmap)); // set all bits to 0 of sell bitmap
     memset(globalOrderInfos, 0, sizeof(globalOrderInfos)); // set all original bits of lookup table to 0
     totalOrders = 0; // original number of orders processed is 0
+    lastSnapshot = std::chrono::steady_clock::now();
 }
 
 uint16_t Engine::getBestAsk() // returns indice of lowest price level with a ask order present
@@ -236,6 +237,36 @@ void Engine::processOrder(const ClientOrder& order)
     totalOrders++; // increment total processed order count
 }
 
+void Engine::buildSnapshot()
+{
+    BookSnapshot snap;
+    snap.totalOrders = totalOrders;
+    snap.bidCount = 0;
+    snap.askCount = 0;
+
+    uint16_t bestBid = getBestBid();
+    for (int i = 0; i < 10 && snap.bidCount < 10; i++)
+    {
+        if (bestBid < i) break;
+        uint16_t level = bestBid - i;
+        uint32_t qty = buyLevels[level].totalQuantity;
+        if (qty == 0) continue;
+        snap.bids[snap.bidCount++] = {basePrice + level, qty};
+    }
+
+    uint16_t bestAsk = getBestAsk();
+    for (int i = 0; i < 10 && snap.askCount < 10; i++)
+    {
+        uint16_t level = bestAsk + i;
+        if (level >= LEVELS) break;
+        uint32_t qty = sellLevels[level].totalQuantity;
+        if (qty == 0) continue;
+        snap.asks[snap.askCount++] = {basePrice + level, qty};
+    }
+
+    snapshotQueue.push(snap);
+}
+
 void Engine::run()
 {
     static uint64_t samples[100000000]; // big buffer to hold per-order latency samples in cycles
@@ -278,9 +309,16 @@ void Engine::run()
 void Engine::runDemo()
 {
     ClientOrder order;
-    while (running.load(std::memory_order_relaxed)) // main demo loop, runs until shutdown signal
+    while (running.load(std::memory_order_relaxed))
     {
-        while (inboundQueue.pop(order)) // process every order currently queued
+        while (inboundQueue.pop(order))
             processOrder(order);
+
+        auto now = std::chrono::steady_clock::now();
+        if (now - lastSnapshot >= std::chrono::seconds(1))
+        {
+            buildSnapshot();
+            lastSnapshot = now;
+        }
     }
 }

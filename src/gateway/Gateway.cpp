@@ -32,7 +32,7 @@ void Gateway::releaseID(uint16_t id)
     freeIDs[--topID] = id; // push ID back into free stack
 }
 
-void Gateway::registerOrder(uint16_t id, uint8_t type)
+void Gateway::registerOrder(uint16_t id, uint8_t type) // STRICTLY FOR ORDER GEN 
 {
     if (type == 0) liveBids.push_back(id); // track live bid order
     else if (type == 1) liveAsks.push_back(id); // track live ask order

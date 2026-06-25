@@ -1,6 +1,7 @@
 #pragma once
 #include <atomic>
 #include "../engine/engine.hpp"
+#include <chrono>
 
 class SnapshotWriter
 {
@@ -11,6 +12,6 @@ class SnapshotWriter
     SnapshotWriter(Engine& engine, std::atomic<bool>& running)
     : engine(engine), running(running) {} // bind engine + running flag
 
-    void writeSnapshot(const char* filename); // dump full orderbook state to json
+    void writeSnapshot(const char* filename, const BookSnapshot& snap); // dump full orderbook state to json
     void run(); // main loop that keeps snapshotting engine state
 };

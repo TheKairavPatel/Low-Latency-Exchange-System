@@ -47,3 +47,18 @@ struct FillResult
     Event events[64]; // events generated from the filling process, up to 64 events can be generated
     uint8_t eventCount; // amount of events generated
 };
+
+struct levelSummary
+{
+    uint32_t price;
+    uint32_t qty;
+};
+
+struct BookSnapshot
+{
+    levelSummary bids[10];
+    levelSummary asks[10];
+    int bidCount;
+    int askCount;
+    uint64_t totalOrders;
+};

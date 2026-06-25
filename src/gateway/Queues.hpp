@@ -33,3 +33,19 @@ class InboundQueue
     bool push(const ClientOrder& order); // gateway pushes new orders
     bool pop(ClientOrder& order); // engine consumes orders
 };
+
+class SnapshotQueue
+{
+    alignas(64) BookSnapshot snapshots[256];
+    alignas(64) std::atomic<uint8_t> head;
+    alignas(64) std::atomic<uint8_t> tail;
+
+    alignas(64) uint8_t cachedHead{0};
+    alignas(64) uint8_t cachedTail{0};
+
+    public:
+    SnapshotQueue() : head(0), tail(0) {}
+
+    bool push(const BookSnapshot& snapshot);
+    bool pop(BookSnapshot& snapshot);
+};

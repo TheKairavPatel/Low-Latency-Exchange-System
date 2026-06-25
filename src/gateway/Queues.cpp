@@ -65,3 +65,34 @@ bool InboundQueue::pop(ClientOrder& order)
     head.store((h + 1) & 0x0FFF, std::memory_order_release); // advance consumer
     return true;
 }
+
+bool SnapshotQueue::pop(BookSnapshot& snapshot)
+{
+    uint8_t h = head.load(std::memory_order_relaxed);
+    if (h == cachedTail)
+    {
+        cachedTail = tail.load(std::memory_order_acquire);
+        if (h == cachedTail)
+            return false;
+    }
+    snapshot = snapshots[h];
+    head.store((h+1), std::memory_order_release);
+    return true;
+}
+
+bool SnapshotQueue::push(const BookSnapshot& snapshot)
+{
+    uint8_t t = tail.load(std::memory_order_relaxed); // producer side (gateway)
+    uint8_t nexttail = (t + 1); // wrap index
+
+    if (nexttail == cachedHead) // fast path full check
+    {
+        cachedHead = head.load(std::memory_order_acquire); // refresh consumer head
+        if (nexttail == cachedHead) // confirmed full
+            return false; // drop order
+    }
+
+    snapshots[t] = snapshot; // write order into ring slot
+    tail.store(nexttail, std::memory_order_release); // publish order
+    return true;
+}
