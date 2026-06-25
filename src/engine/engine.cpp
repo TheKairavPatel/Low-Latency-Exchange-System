@@ -4,6 +4,8 @@
 #include <x86intrin.h>
 #include <algorithm>
 
+// FULLY FINISHED
+
 Engine::Engine(uint32_t basePrice, std::atomic<bool>& running) : basePrice(basePrice), running(running)
 {
     memset(buyBitmap, 0, sizeof(buyBitmap)); // set all bits to 0 of buy bitmap
@@ -239,11 +241,13 @@ void Engine::processOrder(const ClientOrder& order)
 
 void Engine::buildSnapshot()
 {
+    // init values of booksnap obj
     BookSnapshot snap;
     snap.totalOrders = totalOrders;
     snap.bidCount = 0;
     snap.askCount = 0;
 
+    // capture qty at 10 highest bids
     uint16_t bestBid = getBestBid();
     for (int i = 0; i < 10 && snap.bidCount < 10; i++)
     {
@@ -254,6 +258,7 @@ void Engine::buildSnapshot()
         snap.bids[snap.bidCount++] = {basePrice + level, qty};
     }
 
+    // capture qty at 10 lowest asks
     uint16_t bestAsk = getBestAsk();
     for (int i = 0; i < 10 && snap.askCount < 10; i++)
     {
@@ -264,7 +269,7 @@ void Engine::buildSnapshot()
         snap.asks[snap.askCount++] = {basePrice + level, qty};
     }
 
-    snapshotQueue.push(snap);
+    snapshotQueue.push(snap); // push to snapshot queue
 }
 
 void Engine::run()
@@ -309,13 +314,13 @@ void Engine::run()
 void Engine::runDemo()
 {
     ClientOrder order;
-    while (running.load(std::memory_order_relaxed))
+    while (running.load(std::memory_order_relaxed)) // check global running flag 
     {
-        while (inboundQueue.pop(order))
+        while (inboundQueue.pop(order)) // read from gateway
             processOrder(order);
 
         auto now = std::chrono::steady_clock::now();
-        if (now - lastSnapshot >= std::chrono::seconds(1))
+        if (now - lastSnapshot >= std::chrono::seconds(1)) // check if one sec has elapsed, if so build book snapshot for frontend demo
         {
             buildSnapshot();
             lastSnapshot = now;

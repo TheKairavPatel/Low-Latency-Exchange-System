@@ -6,6 +6,8 @@
 #include <pthread.h>
 #include <sched.h>
 
+// FULLY FINISHED
+
 // demo build: runs full pipeline (gateway -> engine -> snapshot writer) with logging enabled
 // used to show correctness + realistic system behavior under ~200k orders
 

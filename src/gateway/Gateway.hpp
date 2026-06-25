@@ -2,6 +2,8 @@
 #include <atomic>
 #include "../engine/engine.hpp"
 
+// FULLY FINISHED
+
 class Gateway
 {
     Engine& engine; // gateway needs a reference to a engine object
@@ -21,5 +23,5 @@ class Gateway
     uint16_t getID(); // returns a new unused engine id 
     void releaseID(uint16_t id); // stores a engine id back into free id list
     ClientOrder generateRandomOrder(); // returns new generated order (in real life would have to read from network)
-    void registerOrder(uint16_t id, uint8_t type); // used for order/cancel simulation
+    void registerOrder(uint16_t id, uint8_t type); // strictly used for order/cancel simulation
 };

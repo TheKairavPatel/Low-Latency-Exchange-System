@@ -2,6 +2,8 @@
 #include <atomic>
 #include "../engine/order.hpp"
 
+// FULLY FINISHED
+
 class OutboundQueue
 {
     alignas(64) Event events[4096]; // ring buffer for engine -> gateway events
@@ -36,11 +38,11 @@ class InboundQueue
 
 class SnapshotQueue
 {
-    alignas(64) BookSnapshot snapshots[256];
-    alignas(64) std::atomic<uint8_t> head;
-    alignas(64) std::atomic<uint8_t> tail;
+    alignas(64) BookSnapshot snapshots[256]; // bugger holding snapshots
+    alignas(64) std::atomic<uint8_t> head; // consumer index (snapshot side)
+    alignas(64) std::atomic<uint8_t> tail; // producer index (engine side)
 
-    alignas(64) uint8_t cachedHead{0};
+    alignas(64) uint8_t cachedHead{0}; // local copy to save us L3 fetches
     alignas(64) uint8_t cachedTail{0};
 
     public:

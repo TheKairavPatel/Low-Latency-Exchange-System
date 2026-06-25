@@ -3,6 +3,8 @@
 #include "../engine/engine.hpp"
 #include <chrono>
 
+// FULLY FINISHED
+
 class SnapshotWriter
 {
     Engine& engine; // reference to live engine state (read-only snapshot source)

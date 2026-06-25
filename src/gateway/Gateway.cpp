@@ -4,6 +4,8 @@
 #include <vector>
 #include <algorithm>
 
+// FULLY FINISHED
+
 static std::vector<uint16_t> liveBids; // tracks active bid order IDs for cancel simulation
 static std::vector<uint16_t> liveAsks; // tracks active ask order IDs for cancel simulation
 
@@ -43,7 +45,7 @@ ClientOrder Gateway::generateRandomOrder()
 {
     static std::mt19937 rng(std::random_device{}()); // RNG for full sim randomness
 
-    static std::normal_distribution<double> bidOffDist(3.0, 1.0); // bid skew distribution
+    static std::normal_distribution<double> bidOffDist(3.0, 1.0); // bid skew distribution, 3 mean stddev 1
     static std::normal_distribution<double> askOffDist(3.0, 1.0); // ask skew distribution
 
     static std::uniform_int_distribution<uint32_t> aggOffDist(1, 3); // aggression offset
@@ -107,13 +109,13 @@ ClientOrder Gateway::generateRandomOrder()
 
 void Gateway::run()
 {
-    uint64_t NS_PER_ORDER = 1'000'000'000ULL / targetRate; // spacing between orders in ns
+    uint64_t NS_PER_ORDER = 1'000'000'000ULL / targetRate; // spacing between orders in ns and use ULL to ensure 64 bit math
 
     FILE* logFile = nullptr;
     if (logging)
     {
         logFile = fopen("logs/eventslog_pretty.txt", "w"); // event log output
-        setvbuf(logFile, nullptr, _IOFBF, 1024 * 1024); // big buffer for speed
+        setvbuf(logFile, nullptr, _IOFBF, 1024 * 1024); // big buffer for speed, nullptr because we dont specify buffer location, IOFBF for flushing only once full
     }
 
     std::mt19937 rng(std::random_device{}()); // ext id generator
@@ -121,8 +123,8 @@ void Gateway::run()
 
     auto nsNow = []() -> uint64_t {
         struct timespec ts;
-        clock_gettime(CLOCK_MONOTONIC, &ts);
-        return ts.tv_sec * 1'000'000'000ULL + ts.tv_nsec; // current time in ns
+        clock_gettime(CLOCK_MONOTONIC, &ts); // linux system call that fills timsepec struct with current time
+        return ts.tv_sec * 1'000'000'000ULL + ts.tv_nsec; // return current timespec seconds in nanoseconds + timespec nanoseconds
     };
 
     uint64_t nextSend = nsNow(); // next send timestamp
@@ -173,7 +175,7 @@ void Gateway::run()
         }
 
         if (nsNow() < nextSend) continue; // throttle order rate
-        nextSend += NS_PER_ORDER;
+        nextSend += NS_PER_ORDER; // next send time should be current plus ns between orders
 
         ClientOrder order = generateRandomOrder(); // create new simulated order
 

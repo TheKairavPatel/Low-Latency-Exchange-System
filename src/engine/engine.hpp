@@ -4,6 +4,8 @@
 #include "../gateway/Queues.hpp"
 #include <chrono>
 
+// FULLY FINISHED
+
 static constexpr uint32_t LEVELS = 2048; // 2048 ($20.48 range) 
 
 class Engine

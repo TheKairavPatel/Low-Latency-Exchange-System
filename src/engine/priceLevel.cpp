@@ -1,5 +1,7 @@
 #include "priceLevel.hpp"
 
+// FULLY FINISHED
+
 PriceLevel::PriceLevel()
 {
     stackTop = 0; // stack is empty when stackTop is 0, and full when stackTop is 255

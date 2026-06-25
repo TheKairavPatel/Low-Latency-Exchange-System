@@ -2,6 +2,8 @@
 #include <cstdio>
 #include <thread>
 
+// FULLY FINISHED
+
 void SnapshotWriter::writeSnapshot(const char* filename, const BookSnapshot& snap)
 {
     FILE* f = fopen(filename, "w");

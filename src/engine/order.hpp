@@ -1,6 +1,7 @@
 #include <cstdint>
 #pragma once
 
+// FULLY FINISHED
 
 // ClientOrder is the order format sent by client to engine
 struct ClientOrder 
@@ -50,15 +51,15 @@ struct FillResult
 
 struct levelSummary
 {
-    uint32_t price;
-    uint32_t qty;
+    uint32_t price; // price of pricelevel we are summarizing
+    uint32_t qty; 
 };
 
 struct BookSnapshot
 {
-    levelSummary bids[10];
-    levelSummary asks[10];
-    int bidCount;
+    levelSummary bids[10]; // closest 10 bids to spread
+    levelSummary asks[10]; //closest 10 asks to spread
+    int bidCount; 
     int askCount;
-    uint64_t totalOrders;
+    uint64_t totalOrders; // how many total orders engine has processed
 };

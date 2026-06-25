@@ -5,6 +5,8 @@
 #include <pthread.h>
 #include <sched.h>
 
+// FULLY FINISHED
+
 // This benchmark runs engine + gateway at full throttle to measure raw throughput + latency under extreme load
 // Engine processes orders, gateway generates them at a fixed high rate (stress test setup)
 
