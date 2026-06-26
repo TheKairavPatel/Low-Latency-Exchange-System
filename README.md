@@ -89,7 +89,7 @@ Edit your GRUB config:
 sudo nano /etc/default/grub
 ```
 
-Add `isolcpus`, `nohz_full`, and `rcu_nocbs` to the kernel command line:
+Add `isolcpus`, `nohz_full`, and `rcu_nocbs` to the kernel command line (USE FREE P-CORES):
 
 ```
 GRUB_CMDLINE_LINUX_DEFAULT="quiet splash isolcpus=1,2 nohz_full=1,2 rcu_nocbs=1,2"
