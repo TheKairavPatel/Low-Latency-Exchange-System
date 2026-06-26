@@ -144,10 +144,12 @@ Engine engine(74000, running);
 // 74000 = base price in ticks
 
 Gateway gw(engine, running, false, 150'000'000, 100'000'000);
-// args: engine ref, shutdown flag, verbose, total orders, target orders/sec
+// args: engine ref, shutdown flag, logging, total orders, target orders/sec
 ```
 
 The target rate (100M/sec) is intentionally above realistic capacity — it puts the engine under maximum queue pressure so throughput is bottlenecked by matching speed, not order generation speed.
+
+Ensure logging is off for benchmark, unless you want a massive file of log text a few gigabytes!
 
 Thread pinning and priorities are set in `main()`:
 
