@@ -1,6 +1,6 @@
 # Low-Latency C++ Exchange System
 
-A simulated exchange system built to explore the systems techniques used in HFT/Exchanges. Implements a full order-matching pipeline — gateway, matching engine, and snapshot writer — running across isolated CPU cores with real-time scheduling.
+A simulated exchange system built to explore the systems techniques used in HFT infrastructure. Implements a full order-matching pipeline — gateway, matching engine, and snapshot writer — running across isolated CPU cores with real-time scheduling.
 
 **This is not a real exchange.** There is no networking, no FIX protocol, no market connectivity. Orders are generated synthetically by the gateway and processed in-process. The goal is to study and measure the performance of core matching engine data structures and lock-free communication under realistic load patterns.
 
@@ -89,7 +89,7 @@ Edit your GRUB config:
 sudo nano /etc/default/grub
 ```
 
-Add `isolcpus`, `nohz_full`, and `rcu_nocbs` to the kernel command line:
+Add `isolcpus`, `nohz_full`, and `rcu_nocbs` to the kernel command line (ISOLATE FREE P-CORES):
 
 ```
 GRUB_CMDLINE_LINUX_DEFAULT="quiet splash isolcpus=1,2 nohz_full=1,2 rcu_nocbs=1,2"
@@ -110,17 +110,10 @@ cat /sys/devices/system/cpu/isolated
 
 ### Run the benchmark
 
-The benchmark requires `CAP_SYS_NICE` to set `SCHED_FIFO`. Either run as root or grant the capability to the binary:
+Run with sudo to allow real-time scheduling:
 
 ```bash
-sudo setcap cap_sys_nice+ep build/LinuxBench
-./build/LinuxBench
-```
-
-For cleanest results, also set the CPU governor to performance mode before running:
-
-```bash
-sudo cpupower frequency-set -g performance
+sudo ./build/LinuxBench
 ```
 
 ---
